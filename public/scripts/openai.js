@@ -500,23 +500,33 @@ async function sendOpenAIRequest(openai_msgs_tosend, signal) {
             const decoder = new TextDecoder();
             const reader = response.body.getReader();
             let getMessage = "";
+            let resetting = false;
             while (true) {
                 const { done, value } = await reader.read();
                 let response = decoder.decode(value);
-
                 if (response == "{\"error\":true}") {
                     throw new Error('error during streaming');
                 }
 
                 let eventList = response.split("\n");
-
                 for (let event of eventList) {
                     if (!event.startsWith("data"))
                         continue;
                     if (event == "data: [DONE]") {
                         return;
                     }
+                    if (resetting) {
+                        getMessage = ""
+                    }
                     let data = JSON.parse(event.substring(6));
+                    if (data.reset) {
+                        getMessage = ""
+                        resetting = true;
+                    } else {
+                        if (resetting) {
+                            resetting = false;
+                        }
+                    }
                     // the first and last messages are undefined, protect against that
                     getMessage += data.choices[0]["delta"]["content"] || "";
                     yield getMessage;
