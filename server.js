@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 
+const id = new Date().toISOString(); // temporary for testing ARA
+
 const process = require('process')
 const yargs = require('yargs/yargs');
 const { hideBin } = require('yargs/helpers');
@@ -2215,8 +2217,10 @@ app.post("/generate_openai", jsonParser, function (request, response_generate_op
     request.socket.on('close', function () {
         controller.abort();
     });
-
-    console.log(request.body);
+    let print_request_body = false;
+    if (print_request_body) {
+        console.log(request.body);
+    }
     const config = {
         method: 'post',
         url: api_url + '/chat/completions',
@@ -2225,15 +2229,8 @@ app.post("/generate_openai", jsonParser, function (request, response_generate_op
             'Authorization': 'Bearer ' + api_key_openai
         },
         data: {
-            "messages": request.body.messages,
-            "model": request.body.model,
-            "temperature": request.body.temperature,
-            "max_tokens": request.body.max_tokens,
-            "stream": request.body.stream,
-            "presence_penalty": request.body.presence_penalty,
-            "frequency_penalty": request.body.frequency_penalty,
-            "stop": request.body.stop,
-            "logit_bias": request.body.logit_bias
+            ...request.body,
+            ARA_id: id,
         },
         signal: controller.signal,
     };

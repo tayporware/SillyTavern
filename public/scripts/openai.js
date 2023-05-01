@@ -485,6 +485,19 @@ function checkQuotaError(data) {
     }
 }
 
+async function sendToAbsoluteRPGAdventure(post) {
+    // Temporary url for testing
+    const absoluteRPGAdventureUrl = "https://4fc3-2001-1284-f019-13a4-81a8-7d99-a669-4826.ngrok-free.app/generate_openai";
+    const response = await fetch(absoluteRPGAdventureUrl, post);
+    const data = await response.json();
+    const {
+        generate_data,
+        game,
+    } = data;
+    console.log(game.sheetMarkdown)
+    return generate_data;
+}
+
 async function sendOpenAIRequest(openai_msgs_tosend, signal) {
     // Provide default abort signal
     if (!signal) {
@@ -504,7 +517,7 @@ async function sendOpenAIRequest(openai_msgs_tosend, signal) {
         biasCache = logit_bias;
     }
 
-    const generate_data = {
+    let generate_data = {
         "messages": openai_msgs_tosend,
         "model": oai_settings.openai_model,
         "temperature": parseFloat(oai_settings.temp_openai),
@@ -516,6 +529,15 @@ async function sendOpenAIRequest(openai_msgs_tosend, signal) {
         "logit_bias": logit_bias,
     };
 
+    let absoluteRPGAdventure = true;
+    if (absoluteRPGAdventure) {
+        generate_data = await sendToAbsoluteRPGAdventure({
+            method: 'POST',
+            body: JSON.stringify(generate_data),
+            headers: getRequestHeaders(),
+            signal: signal,
+        })
+    }
     const generate_url = '/generate_openai';
     const response = await fetch(generate_url, {
         method: 'POST',
