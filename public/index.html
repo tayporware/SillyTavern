@@ -112,9 +112,13 @@
                             <div id="openai_api-presets">
                                 <div>
                                     <h4>OpenAI Presets</h4>
-                                    <select id="settings_perset_openai">
-                                        <option value="gui">Default</option>
-                                    </select>
+                                    <div class="openai_preset_buttons">
+                                        <select id="settings_perset_openai">
+                                            <option value="gui">Default</option>
+                                        </select>
+                                        <i id="update_preset" class="menu_button fa-solid fa-save" title="Update current preset"></i>
+                                        <i id="new_preset" class="menu_button fa-solid fa-plus" title="Create new preset"></i>
+                                    </div>
                                 </div>
                                 <div>
                                     <h4>OpenAI Model</h4>
@@ -124,10 +128,6 @@
                                         <option value="gpt-4">gpt-4</option>
                                         <option value="gpt-4-32k">gpt-4-32k</option>
                                     </select>
-                                </div>
-                                <div class="range-block openai_preset_buttons">
-                                    <input id="update_preset" class="menu_button" type="button" value="Update current preset">
-                                    <input id="new_preset" class="menu_button" type="button" value="Create new preset">
                                 </div>
                             </div>
                             <div id="textgenerationwebui_api-presets">
@@ -268,7 +268,11 @@
                                     </div>
                                     <div class="range-block-counter">
                                         Alternative server URL (leave empty to use the default value).<br>
-                                        <b class="reverse_proxy_warning">Don't expose your real API keys to reverse proxies!</b>
+                                        <div id="ReverseProxyWarningMessage" class="reverse_proxy_warning">
+                                            <b>Remove your real OAI API Key from the API panel BEFORE typing anything into this box.</b>
+                                            <hr>
+                                            <b>We cannot provide support for problems encountered while using an unofficial OpenAI proxy.</b>
+                                        </div>
                                     </div>
                                     <div class="wide100p">
                                         <input id="openai_reverse_proxy" type="text" class="text_pole" placeholder="https://api.openai.com/v1" maxlength="100" />
@@ -1120,27 +1124,24 @@
             </div>
             <div class="drawer-content closedDrawer">
                 <div id="wi-holder">
-                    <div id="world_info_block">
-                        <h3>World Info</h3>
-                        <div id="world_info_buttons">
-                            <div id="world_create_button" class="right_menu_button">
-                                <h4>+Create</h4>
-                            </div>
-                            <div id="world_import_button" class="right_menu_button">
-                                <h4>+Import</h4>
-                            </div>
-                        </div>
+                    <h3>
+                        World Info
+                        <a href="/notes#worldinfo" class="notes-link" target="_blank">
+                            <span class="note-link-span">?</span>
+                        </a>
+                    </h3>
+                    <form id="form_world_import" action="javascript:void(null);" method="post" enctype="multipart/form-data">
+                        <input type="file" id="world_import_file" accept=".json" name="avatar" hidden>
+                    </form>
+                    <div class="world_info_select_block">
+                        <select id="world_info" class="flexGrow">
+                            <option value="None">None</option>
+                        </select>
+                        <div id="world_create_button" class="menu_button fa-solid fa-plus" title="Create"></div>
+                        <div id="world_import_button" class="menu_button fa-solid fa-file-arrow-up" title="Import"></div>
+                        <div id="world_info_edit_button" class="menu_button fa-solid fa-pencil" title="Details"></div>
                     </div>
-                    <h4>How to use <a href="/notes#worldinfo" class="notes-link" target="_blank"><span class="note-link-span">?</span></a></h4>
-                    <div id="rm_world_import" class="right_menu" style="display: none;">
-                        <form id="form_world_import" action="javascript:void(null);" method="post" enctype="multipart/form-data">
-                            <input type="file" id="world_import_file" accept=".json" name="avatar">
-                        </form>
-                    </div>
-                    <select id="world_info">
-                        <option value="None">None</option>
-                    </select>
-                    <input id="world_info_edit_button" class="menu_button" type="submit" value="Details">
+
                     <div id="world_info_depth_block">
                         <h4>
                             Scan Depth <a href="/notes#scandepth" class="notes-link" target="_blank"><span class="note-link-span">?</span></a>
@@ -1346,16 +1347,34 @@
                                 <input id="auto_scroll_chat_to_bottom" type="checkbox" />
                                 Auto-scroll Chat
                             </label>
+                            <label for="render_formulas">
+                                <input id="render_formulas" type="checkbox" />
+                                Render Formulas
+                                <a href="/notes#formulasrendering" class="notes-link" target="_blank">
+                                    <span class="note-link-span">?</span>
+                                </a>
+                            </label>
+                            <div class="flex-container flexFlowColumn">
+                                <h4>
+                                    Send on Enter
+                                </h4>
+                                <select id="send_on_enter">
+                                    <option value="-1">Always disabled</option>
+                                    <option value="0">Automatic (desktop)</option>
+                                    <option value="1">Always enabled</option>
+                                </select>
+                            </div>
                         </div>
                     </div>
 
                     <div name="NameAndAvatar" class="flex-container flexFlowColumn drawer25pWidth">
                         <div name="NameChanger">
-                            <form id='form_change_name' action="javascript:void(null);" method="post" enctype="multipart/form-data">
-                                <h4>Name</h4>
+                            <h4>Name</h4>
+                            <div class="change_name">
                                 <input id="your_name" name="your_name" class="text_pole" maxlength="50" value="" autocomplete="off">
-                                <input id="your_name_button" class="menu_button" type="submit" title="Click to set a new User Name (reloads page)" value="Update">
-                            </form>
+                                <div id="your_name_button" class="menu_button fa-solid fa-check" title="Click to set a new User Name">
+                                </div>
+                            </div>
                         </div>
                         <div name="AvatarSelector">
                             <h4>Your Avatar</h4>
@@ -1368,10 +1387,6 @@
                             </form>
                         </div>
                     </div>
-
-
-
-                    <!-- </div> -->
                 </div>
             </div>
         </div>
@@ -1437,149 +1452,163 @@
             </div>
             <nav id="right-nav-panel" class="drawer-content closedDrawer fillRight">
                 <div id="right-nav-panelheader" class="fa-solid fa-grip drag-grabber"></div>
-                <div id="rm_button_panel_pin_div" title="Locked = Character Management panel will stay open">
-                    <input type="checkbox" id="rm_button_panel_pin">
-                    <label for="rm_button_panel_pin">
-                        <div class="fa-solid unchecked  fa-lock-open" alt=""></div>
-                        <div class="fa-solid checked  fa-lock" alt=""></div>
-                    </label>
-                </div>
-                <div class="scrollableInner">
+
+                <div id="rm_PinAndTabs">
+                    <div id="rm_button_panel_pin_div" title="Locked = Character Management panel will stay open">
+                        <input type="checkbox" id="rm_button_panel_pin">
+                        <label for="rm_button_panel_pin">
+                            <div class="fa-solid unchecked  fa-lock-open" alt=""></div>
+                            <div class="fa-solid checked  fa-lock" alt=""></div>
+                        </label>
+                    </div>
                     <div id="right-nav-panel-tabs">
                         <div class="right_menu_button fa-solid fa-list-ul" id="rm_button_characters" title="Select/Create Characters"></div>
                         <div class="right_menu_button" id="rm_button_selected_ch">
                             <h2></h2>
                         </div>
-
                     </div>
-                    <div id="rm_ch_create_block" class="right_menu" style="display: none;">
-                        <form id="form_create" action="javascript:void(null);" method="post" enctype="multipart/form-data">
-                            <div id="avatar-and-name-block">
-                                <div id="name_div">
-                                    <h4>Character Name</h4>
-                                    <input id="character_name_pole" name="ch_name" class="text_pole" placeholder="Name this character" maxlength="50" value="" autocomplete="off">
-                                </div>
+                </div>
 
-                                <div id="avatar_div" class="avatar_div">
-                                    <div id="avatar_div_div" class="avatar">
-                                        <img id="avatar_load_preview" src="img/ai4.png" alt="avatar">
-                                    </div>
-                                    <div class="form_create_bottom_buttons_block">
-                                        <label for="add_avatar_button" class="menu_button fa-solid fa-file-image " title="Click to select a new avatar for this character">
-                                            <input type="file" id="add_avatar_button" name="avatar" accept="image/png, image/jpeg, image/jpg, image/gif, image/bmp">
-                                        </label>
-                                        <div id="rm_button_back" class="menu_button fa-solid fa-left-long "></div>
-                                        <div id="renameCharButton" class="menu_button fa-solid fa-user-pen" title="Rename Character"></div>
-                                        <div id="favorite_button" class="menu_button fa-solid fa-star" title="Add to Favorites"></div>
-                                        <input type="hidden" id="fav_checkbox" name="fav" />
-                                        <div id="advanced_div" class="menu_button fa-solid fa-book " title="Advanced Definitions"></div>
-                                        <div id="export_button" class="menu_button fa-solid fa-file-export " title="Export and Download"></div>
-                                        <label for="create_button" id="create_button_label" class="menu_button fa-solid fa-user-check" title="Create Character">
-                                            <input type="submit" id="create_button" name="create_button">
-                                        </label>
-                                        <div id="delete_button" class="menu_button fa-solid fa-trash-can " title="Delete Character"></div>
-                                    </div>
-                                </div>
-                                <div title="Token counts may be inaccurate and provided just for reference." id="result_info">&nbsp;</div>
-                            </div>
-                            <hr>
 
-                            <div id="tags_div">
-                                <!-- <div class="margin-bot-10px">Tags</div> -->
-                                <input id="tagInput" class="text_pole" placeholder="Search / Create tags" maxlength="50" />
-                                <div id="tagList" class="tags"></div>
+                <div id="rm_ch_create_block" class="right_menu flex-container flexFlowColumn" style="display: none;">
+                    <form id="form_create" action="javascript:void(null);" method="post" enctype="multipart/form-data">
+
+                        <div id="avatar-and-name-block">
+                            <div id="name_div">
+                                <input id="character_name_pole" name="ch_name" class="text_pole" placeholder="Name this character" maxlength="50" value="" autocomplete="off">
                             </div>
 
-                            <div id="description_div" class="margin-bot-10px">
-                                Description
-                                <a href="/notes#characterdescription" class="notes-link" target="_blank">
+                            <div id="avatar_div" class="avatar_div">
+                                <div id="avatar_div_div" class="avatar">
+                                    <img id="avatar_load_preview" src="img/ai4.png" alt="avatar">
+                                </div>
+                                <div class="form_create_bottom_buttons_block">
+                                    <label for="add_avatar_button" class="menu_button fa-solid fa-file-image " title="Click to select a new avatar for this character">
+                                        <input type="file" id="add_avatar_button" name="avatar" accept="image/png, image/jpeg, image/jpg, image/gif, image/bmp">
+                                    </label>
+                                    <div id="rm_button_back" class="menu_button fa-solid fa-left-long "></div>
+                                    <div id="renameCharButton" class="menu_button fa-solid fa-user-pen" title="Rename Character"></div>
+                                    <div id="favorite_button" class="menu_button fa-solid fa-star" title="Add to Favorites"></div>
+                                    <input type="hidden" id="fav_checkbox" name="fav" />
+                                    <div id="advanced_div" class="menu_button fa-solid fa-book " title="Advanced Definitions"></div>
+                                    <div id="export_button" class="menu_button fa-solid fa-file-export " title="Export and Download"></div>
+                                    <label for="create_button" id="create_button_label" class="menu_button fa-solid fa-user-check" title="Create Character">
+                                        <input type="submit" id="create_button" name="create_button">
+                                    </label>
+                                    <div id="delete_button" class="menu_button fa-solid fa-trash-can " title="Delete Character"></div>
+                                </div>
+                            </div>
+                            <div title="Token counts may be inaccurate and provided just for reference." id="result_info">&nbsp;</div>
+                        </div>
+                        <hr>
+
+                        <div id="tags_div">
+                            <div class="tag_controls">
+                                <input id="tagInput" class="text_pole tag_input" placeholder="Search / Create tags" maxlength="25" />
+                                <div class="tags_view menu_button fa-solid fa-pen-to-square" title="View all tags"></div>
+                            </div>
+                            <div id="tagList" class="tags"></div>
+                        </div>
+
+                        <div id="description_div" class="margin-bot-10px">
+                            Description
+                            <a href="/notes#characterdescription" class="notes-link" target="_blank">
+                                <span class="note-link-span">?</span>
+                            </a>
+                        </div>
+
+                        <textarea id="description_textarea" placeholder="Describe your character's physical and mental traits here." class="margin-bot-10px" name="description" placeholder=""></textarea>
+
+                        <div id="first_message_div" class="margin-bot-10px">
+                            First message
+                            <a href="/notes#firstmessage" class="notes-link" target="_blank">
+                                <span class="note-link-span">?</span>
+                            </a>
+
+                        </div>
+                        <textarea id="firstmessage_textarea" placeholder="This will be the first message from the character that starts every chat." class="margin-bot-10px" name="first_mes" placeholder=""></textarea>
+
+                        <!-- these divs are invisible and used for server communication purposes -->
+                        <div id="hidden-divs">
+                            <div id="avatar_url_div">
+                                <input id="avatar_url_pole" name="avatar_url" class="text_pole" maxlength="999" size="2" value="" autocomplete="off">
+                            </div>
+                            <div id="selected_chat_div">
+                                <input id="selected_chat_pole" name="chat" class="text_pole" maxlength="999" size="2" value="" autocomplete="off">
+                            </div>
+                            <div id="create_date_div">
+                                <input id="create_date_pole" name="create_date" class="text_pole" maxlength="999" size="2" value="" autocomplete="off">
+                            </div>
+                            <div id="last_mes_div">
+                                <input id="last_mes_pole" name="last_mes" class="text_pole" maxlength="999" size="2" value="" autocomplete="off">
+                            </div>
+                        </div>
+
+                        <!-- now back to normal divs for display purposes-->
+                    </form>
+                </div>
+                <div id="rm_group_chats_block" class="right_menu">
+                    <div id="rm_group_top_bar">
+                        <div id="rm_button_back_from_group" class="menu_button fa-solid fa-left-long"></div>
+                        <input id="rm_group_chat_name" class="text_pole" type="text" name="chat_name" placeholder="Chat Name (Optional)" maxlength="100" />
+                        <div id="group_favorite_button" class="menu_button fa-solid fa-star" title="Add to Favorites"></div>
+                        <input id="rm_group_fav" type="hidden" />
+                        <div id="rm_group_submit" class="menu_button fa-solid fa-check" title="Create"></div>
+                        <div id="rm_group_delete" class="menu_button fa-solid fa-trash-can" title="Delete"></div>
+                    </div>
+                    <div id="rm_group_buttons">
+                        <div class="flex1">
+                            <h5>
+                                Group reply strategy
+                                <a href="/notes#replyorderstrategies" class="notes-link" target="_blank">
                                     <span class="note-link-span">?</span>
                                 </a>
-                            </div>
-
-                            <textarea id="description_textarea" placeholder="Describe your character's physical and mental traits here." class="margin-bot-10px" name="description" placeholder=""></textarea>
-
-                            <div id="first_message_div" class="margin-bot-10px">
-                                First message
-                                <a href="/notes#firstmessage" class="notes-link" target="_blank">
-                                    <span class="note-link-span">?</span>
-                                </a>
-
-                            </div>
-                            <textarea id="firstmessage_textarea" placeholder="This will be the first message from the character that starts every chat." class="margin-bot-10px" name="first_mes" placeholder=""></textarea>
-
-                            <!-- these divs are invisible and used for server communication purposes -->
-                            <div id="hidden-divs">
-                                <div id="avatar_url_div">
-                                    <input id="avatar_url_pole" name="avatar_url" class="text_pole" maxlength="999" size="2" value="" autocomplete="off">
-                                </div>
-                                <div id="selected_chat_div">
-                                    <input id="selected_chat_pole" name="chat" class="text_pole" maxlength="999" size="2" value="" autocomplete="off">
-                                </div>
-                                <div id="create_date_div">
-                                    <input id="create_date_pole" name="create_date" class="text_pole" maxlength="999" size="2" value="" autocomplete="off">
-                                </div>
-                                <div id="last_mes_div">
-                                    <input id="last_mes_pole" name="last_mes" class="text_pole" maxlength="999" size="2" value="" autocomplete="off">
-                                </div>
-                            </div>
-                            <!-- now back to normal divs for display purposes-->
-                        </form>
+                            </h5>
+                            <label class="checkbox_label">
+                                <input type="radio" name="rm_group_activation_strategy" value="0" />
+                                Natural order
+                            </label>
+                            <label class="checkbox_label">
+                                <input type="radio" name="rm_group_activation_strategy" value="1" />
+                                List order
+                            </label>
+                        </div>
+                        <div class="flex1">
+                            <label class="checkbox_label">
+                                <input id="rm_group_allow_self_responses" type="checkbox" />
+                                Allow self responses
+                            </label>
+                            <label id="rm_group_automode_label" class="checkbox_label">
+                                <input id="rm_group_automode" type="checkbox" />
+                                Auto Mode
+                            </label>
+                        </div>
                     </div>
-                    <div id="rm_group_chats_block" class="right_menu">
-                        <div id="rm_group_top_bar">
-                            <div id="rm_button_back_from_group" class="menu_button fa-solid fa-left-long"></div>
-                            <input id="rm_group_chat_name" class="text_pole" type="text" name="chat_name" placeholder="Chat Name (Optional)" maxlength="100" />
+                    <div id="group_tags_div" class="wide100p">
+                        <div class="tag_controls">
+                            <input id="groupTagInput" class="text_pole tag_input flex1" placeholder="Search / Create tags" maxlength="25" />
+                            <div class="tags_view menu_button fa-solid fa-pen-to-square" title="View all tags"></div>
                         </div>
-                        <div id="rm_group_buttons">
-                            <div class="rm_group_settings">
-                                <label class="checkbox_label">
-                                    <input id="rm_group_fav" type="checkbox" />
-                                    Favorite
-                                </label>
-                                <label class="checkbox_label">
-                                    <input id="rm_group_allow_self_responses" type="checkbox" />
-                                    Allow bot responses to self
-                                </label>
-                                <label id="rm_group_automode_label" class="checkbox_label">
-                                    <input id="rm_group_automode" type="checkbox" />
-                                    Auto Mode
-                                </label>
-                                <h5>
-                                    Group reply strategy
-                                    <a href="/notes#groupreplystrategy" class="notes-link" target="_blank"><span class="note-link-span">?</span></a>
-                                </h5>
-                                <label>
-                                    <input type="radio" name="rm_group_activation_strategy" value="0" />
-                                    Natural order
-                                </label>
-                                <label>
-                                    <input type="radio" name="rm_group_activation_strategy" value="1" />
-                                    List order
-                                </label>
-                            </div>
-                            <div id="rm_group_buttons_expander">&nbsp;</div>
-                            <input id="rm_group_submit" class="menu_button" type="submit" value="Create">
-                            <input id="rm_group_delete" class="menu_button" type="submit" value="Delete">
-                        </div>
-                        <div id="rm_group_add_members_header">
-                            <h3>Add Members</h3>
-                            <input id="rm_group_filter" class="text_pole" type="search" placeholder="Filter..." maxlength="100" />
-                        </div>
-                        <!-- !!!Don't break line after div!!! -->
+                        <div id="groupTagList" class="tags"></div>
+                    </div>
+                    <div id="rm_group_add_members_header">
+                        <h3>Add Members</h3>
+                        <input id="rm_group_filter" class="text_pole" type="search" placeholder="Filter..." maxlength="100" />
+                    </div>
+                    <div class="flex-container flexFlowColumn flexNoGap overflowYAuto wide100p flexGrow">
                         <div id="rm_group_add_members"></div>
                         <h3>Members</h3>
-                        <!-- !!!Don't break line after div!!! -->
                         <div id="rm_group_members"></div>
                     </div>
-
-                    <div id="rm_character_import" class="right_menu" style="display: none;">
-                        <form id="form_import" action="javascript:void(null);" method="post" enctype="multipart/form-data">
-                            <input multiple type="file" id="character_import_file" accept=".json, image/png, image/webp" name="avatar">
-                            <input id="character_import_file_type" name="file_type" class="text_pole" maxlength="999" size="2" value="" autocomplete="off">
-                        </form>
-                    </div>
-                    <div id="rm_characters_block" class="right_menu">
+                </div>
+                <div id="rm_character_import" class="right_menu" style="display: none;">
+                    <form id="form_import" action="javascript:void(null);" method="post" enctype="multipart/form-data">
+                        <input multiple type="file" id="character_import_file" accept=".json, image/png, image/webp" name="avatar">
+                        <input id="character_import_file_type" name="file_type" class="text_pole" maxlength="999" size="2" value="" autocomplete="off">
+                    </form>
+                </div>
+                <div id="rm_characters_block" class="right_menu">
+                    <div id="charListFixedTop">
                         <div class="form_create_bottom_buttons_block">
                             <div id="rm_button_create" title="Create New Character" class="menu_button fa-solid fa-user-plus "></div>
                             <div id="character_import_button" title="Import Character from File" class="menu_button fa-solid fa-file-arrow-up "></div>
@@ -1599,21 +1628,20 @@
                                 <option data-field="chat_size" data-order="asc">Least chatted</option>
                             </select>
                         </form>
-                        <div id="rm_tag_filter" class="tags">
-
-                        </div>
-                        <div id="rm_print_characters_block"></div>
+                        <div id="rm_tag_filter" class="tags"></div>
                     </div>
+                    <div id="rm_print_characters_block"></div>
+                </div>
 
-                    <!-- only displays after creating/deleting a character/group -->
-                    <div id="rm_info_block" class="right_menu">
-                        <div id="rm_info_panel">
-                            <div id="rm_info_avatar"></div>
-                            <div id="rm_info_text"></div>
-                            <div id="rm_info_button" class="menu_button">Back</div>
-                        </div>
+                <!-- only displays after creating/deleting a character/group -->
+                <div id="rm_info_block" class="right_menu">
+                    <div id="rm_info_panel">
+                        <div id="rm_info_avatar"></div>
+                        <div id="rm_info_text"></div>
+                        <div id="rm_info_button" class="menu_button">Back</div>
                     </div>
                 </div>
+
             </nav>
         </div>
 
@@ -1621,12 +1649,16 @@
     <!-- various fullscreen popups -->
     <div id="shadow_popup">
         <div id="dialogue_popup">
-            <div id="dialogue_popup_text">
-                <h3>text</h3>
+            <div id="dialogue_popup_holder">
+                <div id="dialogue_popup_text">
+                    <h3>text</h3>
+                </div>
+                <input id="dialogue_popup_input" class="text_pole" type="text" />
+                <div id="dialogue_popup_controls">
+                    <div id="dialogue_popup_ok" class="menu_button">Delete</div>
+                    <div id="dialogue_popup_cancel" class="menu_button">Cancel</div>
+                </div>
             </div>
-            <input id="dialogue_popup_input" class="text_pole" type="text" />
-            <div id="dialogue_popup_ok" class="menu_button">Delete</div>
-            <div id="dialogue_popup_cancel" class="menu_button">Cancel</div>
         </div>
     </div>
     <div id="colab_shadow_popup">
@@ -1703,6 +1735,7 @@
                         <a href="/notes#worldinfoentry" class="notes-link" target="_blank"><span class="note-link-span">?</span></a>
                     </h3>
                 </div>
+                <div id="OpenAllWIEntries" class="menu_button fa-solid fa-expand"></div>
                 <div class="world_popup_expander">&nbsp;</div>
                 <form id="form_rename_world" action="javascript:void(null);" method="post" enctype="multipart/form-data">
                     <input id="world_popup_name" name="world_popup_name" class="text_pole" maxlength="99" size="32" value="" autocomplete="off">
@@ -1719,86 +1752,6 @@
             <span class="world_popup_expander">&nbsp;</span>
             <div id="world_popup_export" class="menu_button">Export</div>
             <div id="world_popup_delete" class="menu_button">Delete World</div>
-        </div>
-
-        <div id="entry_edit_template">
-            <div class="world_entry">
-                <form class="world_entry_form">
-                    <div class="world_entry_thin_controls">
-                        <div class="world_entry_form_control">
-                            <label for="key">
-                                <h4>Key</h4>
-                                <h5>Comma-separated list of keywords (e.g: foo,bar).</h5>
-                            </label>
-                            <textarea class="text_pole" name="key" rows="1" placeholder="" maxlength="250"></textarea>
-                        </div>
-                        <div class="world_entry_form_control keysecondary">
-                            <label for="keysecondary">
-                                <h4>Secondary Key</h4>
-                                <h5>Comma-separated list of additional keywords.</h5>
-                            </label>
-                            <textarea class="text_pole" name="keysecondary" rows="1" placeholder="" maxlength="250"></textarea>
-                        </div>
-                    </div>
-                    <div class="world_entry_thin_controls">
-                        <div class="world_entry_form_control">
-                            <label for="order">
-                                <h4>Insertion Order</h4>
-                                <h5>Higher order number entries will be inserted first.</h5>
-                            </label>
-                            <input class="text_pole" type="number" name="order" placeholder="" />
-                        </div>
-                        <div class="world_entry_form_control">
-                            <label for="comment">
-                                <h4>Comment</h4>
-                                <h5>Optional comment (doesn't affect the AI).</h5>
-                            </label>
-                            <textarea class="text_pole" rows="1" name="comment" maxlength="250"></textarea>
-                        </div>
-                    </div>
-                    <div class="world_entry_form_control">
-                        <label for="content">
-                            <h4>Content</h4>
-                            <h5>Text that will be inserted to the prompt upon activation.</h5>
-                        </label>
-                        <textarea class="text_pole" name="content" rows="4" placeholder=""></textarea>
-                    </div>
-                    <div class="world_entry_form_control world_entry_form_horizontal">
-                        <label class="checkbox">
-                            <input type="checkbox" name="constant" />
-                            <h4>Constant</h4>
-                        </label>
-                        <label class="checkbox">
-                            <input type="checkbox" name="selective" />
-                            <h4>Selective</h4>
-                        </label>
-                        <div class="world_entry_form_control world_entry_form_radios">
-                            <div>
-                                <label><input type="radio" name="position" value="0">
-                                    <h4>Before Chara</h4>
-                                </label>
-                            </div>
-                            <div>
-                                <label><input type="radio" name="position" value="1">
-                                    <h4>After Chara</h4>
-                                </label>
-                            </div>
-                        </div>
-                        <span class="world_popup_expander">&nbsp;</span>
-                        <h5 class="world_entry_form_uid">
-                            UID:
-                            &nbsp;
-                            <span class="world_entry_form_uid_value"></span>
-                        </h5>
-                        <h5 class="world_entry_form_tokens">
-                            Tokens used:
-                            &nbsp;
-                            <span class="world_entry_form_token_counter">0</span>
-                        </h5>
-                        <input class="menu_button delete_entry_button" type="submit" value="Delete Entry" />
-                    </div>
-                </form>
-            </div>
         </div>
     </div>
     <div id="shadow_select_chat_popup">
@@ -1831,6 +1784,119 @@
 
     <!-- templates for JS to reuse when needed -->
 
+    <div id="tag_view_template" class="template_element">
+        <div class="tag_view_item">
+            <div class="tag_view_name" contenteditable="true"></div>
+            <div class="tag_view_counter"><span class="tag_view_counter_value"></span>&nbsp;entries</div>
+            <div title="Delete tag" class="tag_delete fa-solid fa-trash-can right_menu_button"></div>
+        </div>
+    </div>
+
+    <div id="entry_edit_template" class="template_element">
+        <div class="world_entry">
+            <form class="world_entry_form">
+                <div class="inline-drawer wide100p">
+                    <div class="inline-drawer-toggle inline-drawer-header">
+                        <div class="world_entry_thin_controls wide100p">
+                            <div class="world_entry_form_control">
+                                <label for="key">
+                                    <h4>Keywords</h4>
+                                    <h5>Seperate by commas</h5>
+                                </label>
+                                <textarea class="text_pole" name="key" rows="1" placeholder="" maxlength="250"></textarea>
+                            </div>
+                            <div class="world_entry_form_control keysecondary">
+                                <label for="keysecondary">
+                                    <h4>Secondary Required Keywords</h4>
+                                    <h5>Separate by commas</h5>
+                                </label>
+                                <textarea class="text_pole" name="keysecondary" rows="1" placeholder="" maxlength="250"></textarea>
+                            </div>
+                        </div>
+                        <div class="fa-solid fa-circle-chevron-down inline-drawer-icon down"></div>
+                    </div>
+                    <div class="inline-drawer-content">
+                        <div class="world_entry_thin_controls  wide100p">
+                            <div class="world_entry_form_control">
+                                <label for="content ">
+                                    <h4>Content</h4>
+                                    <h5>What this keyword should mean to the AI</h5>
+                                </label>
+                                <textarea class="text_pole" name="content" rows="4" placeholder=""></textarea>
+                            </div>
+                        </div>
+                        <div class="world_entry_thin_controls  wide100p">
+
+                            <div class="world_entry_form_control">
+                                <label for="comment">
+                                    <h4>Memo/Note</h4>
+                                    <h5>Not sent to AI</h5>
+                                </label>
+                                <textarea class="text_pole" rows="1" name="comment" maxlength="250"></textarea>
+                            </div>
+                        </div>
+
+
+                        <div class="world_entry_form_control world_entry_form_horizontal">
+                            <div class="flex-container flexFlowColumn flexNoGap  wi-enter-footer-text ">
+                                <label class="checkbox">
+                                    <input type="checkbox" name="constant" />
+                                    <span>Constant</span>
+                                </label>
+                                <label class="checkbox">
+                                    <input type="checkbox" name="selective" />
+                                    <span>Selective</span>
+                                </label>
+                            </div>
+                            <div class="world_entry_form_control world_entry_form_radios  wi-enter-footer-text">
+                                <div>
+                                    <label><input type="radio" name="position" value="0">
+                                        <span>Before Char</span>
+                                    </label>
+                                </div>
+                                <div>
+                                    <label><input type="radio" name="position" value="1">
+                                        <span>After Char</span>
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="world_entry_form_control wi-enter-footer-text flex-container flexNoGap "> <!-- world_entry_form_control -->
+                                <!-- <label for="order"> -->
+
+                                Insertion Order
+                                <!-- Bigger number = inserted earlier -->
+
+                                <!-- </label> -->
+                                <input class="text_pole wide50px" type="number" name="order" placeholder="" />
+                            </div>
+
+
+                            <div class="flex-container flexFlowColumn flexNoGap  wi-enter-footer-text">
+                                <div class="world_entry_form_uid">
+                                    UID:
+                                    &nbsp;
+                                    <span class="world_entry_form_uid_value"></span>
+                                </div>
+                                <div class="world_entry_form_tokens">
+                                    Tokens:
+                                    &nbsp;
+                                    <span class="world_entry_form_token_counter">0</span>
+                                </div>
+                            </div>
+                            <div>
+                                <label class="checkbox">
+                                    <input type="checkbox" name="disable" />
+                                    <span>Disable</span>
+                                </label>
+                            </div>
+                            <span class="world_popup_expander">&nbsp;</span>
+                            <input class="menu_button delete_entry_button" type="submit" value="Delete Entry" />
+                        </div>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
     <div id="character_template" class="template_element">
         <div class="character_select flex-container wide100p alignitemsflexstart" chid="" id="">
             <div class="avatar" title="">
@@ -1934,13 +2000,11 @@
             <div class="avatar">
                 <img src="">
             </div>
-            <!--             <div class="group_icon">
-                <div class="fa-solid fa-user-group"></div>
-            </div> -->
             <div class="flex-container wide100pLess70px gap5px">
                 <div class="ch_name"></div>
                 <i class='group_fav_icon fa-solid fa-star'></i>
                 <input class="ch_fav" value="" hidden />
+                <div class="tags tags_inline"></div>
             </div>
         </div>
     </div>
@@ -1964,7 +2028,7 @@
                 <textarea id="send_textarea" placeholder="Not connected to API!" name="text"></textarea>
                 <div id="send_but_sheld">
                     <div id="loading_mes">
-                        <div alt="" class="fa-solid fa-fade fa-hourglass-half"></div>
+                        <div alt="" class="fa-solid fa-hourglass-half"></div>
                     </div>
                     <div id="send_but" class="fa-solid fa-feather-pointed"></div>
                 </div>

@@ -166,9 +166,9 @@ A list of keywords that trigger the activation of a World Info entry.
 
 #### Secondary Key
 
-A list of supplementary keywords that are used in conjunction with the main keywords (see [Selective](#selective)).
+A list of supplementary keywords that are used in conjunction with the main keywords. See [Selective](#selective).
 
-#### Content
+#### Entry Content
 
 The text that is inserted into the prompt upon entry activation.
 
@@ -542,3 +542,21 @@ To play your own custom sound on receiving a new message from bot, replace the f
 Plays at 80% volume.
 
 If "Background Sound Only" option is enabled, the sound plays only if SillyTavern window is **unfocused**.
+
+### Formulas Rendering
+
+Enables math formulas rendering using the [showdown-katex](https://obedm503.github.io/showdown-katex/) package.
+
+The following formatting rules are supported:
+
+#### LaTeX syntax
+```
+$$ formula goes here $$
+```
+
+#### Asciimath syntax
+```
+$ formula goes here $
+```
+
+More information: [KaTeX](https://katex.org/)

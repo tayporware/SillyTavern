@@ -7,17 +7,16 @@
 import {
     saveSettingsDebounced,
     substituteParams,
-    count_view_mes,
     checkOnlineStatus,
     setOnlineStatus,
     getExtensionPrompt,
-    token,
     name1,
     name2,
     extension_prompt_types,
     characters,
     this_chid,
     callPopup,
+    getRequestHeaders,
 } from "../script.js";
 import { groups, selected_group } from "./group-chats.js";
 
@@ -148,22 +147,12 @@ function setOpenAIMessages(chat) {
     // clean openai msgs
     openai_msgs = [];
     for (let i = chat.length - 1; i >= 0; i--) {
-        // first greeting message
-        if (j == 0) {
-            chat[j]['mes'] = substituteParams(chat[j]['mes']);
-        }
         let role = chat[j]['is_user'] ? 'user' : 'assistant';
         let content = chat[j]['mes'];
 
         // for groups - prepend a character's name
         if (selected_group) {
             content = `${chat[j].name}: ${content}`;
-        }
-
-        // system messages produce no content
-        if (chat[j]['is_system']) {
-            role = 'system';
-            content = '';
         }
 
         // replace bias markup
@@ -199,19 +188,17 @@ function setOpenAIMessageExamples(mesExamplesArray) {
     }
 }
 
-function generateOpenAIPromptCache(charPersonality, topAnchorDepth, anchorTop, anchorBottom) {
+function generateOpenAIPromptCache(charPersonality, topAnchorDepth, anchorTop, bottomAnchorThreshold, anchorBottom) {
     openai_msgs = openai_msgs.reverse();
-    let is_add_personality = false;
     openai_msgs.forEach(function (msg, i, arr) {//For added anchors and others
         let item = msg["content"];
-        if (i === openai_msgs.length - topAnchorDepth && count_view_mes >= topAnchorDepth && !is_add_personality) {
-            is_add_personality = true;
-            if ((anchorTop != "" || charPersonality != "")) {
-                if (anchorTop != "") charPersonality += ' ';
-                item = `[${name2} is ${charPersonality}${anchorTop}]\n${item}`;
+        if (i === openai_msgs.length - topAnchorDepth) {
+            let personalityAndAnchor = [charPersonality, anchorTop].filter(x => x).join(' ');
+            if (personalityAndAnchor) {
+                item = `[${name2} is ${personalityAndAnchor}]\n${item}`;
             }
         }
-        if (i >= openai_msgs.length - 1 && count_view_mes > 8 && $.trim(item).substr(0, (name1 + ":").length) == name1 + ":") {//For add anchor in end
+        if (i === openai_msgs.length - 1 && openai_msgs.length > bottomAnchorThreshold && $.trim(item).substr(0, (name1 + ":").length) == name1 + ":") {//For add anchor in end
             item = anchorBottom + "\n" + item;
         }
 
@@ -278,7 +265,7 @@ function formatWorldInfo(value) {
     }
 
     // placeholder if we would want to apply some formatting
-    return `[Details of the fictional world the RP set in:\n${value}\n]`;
+    return `[Details of the fictional world the RP is set in:\n${value}]\n`;
 }
 
 async function prepareOpenAIMessages(name2, storyString, worldInfoBefore, worldInfoAfter, extensionPrompt, bias, type) {
@@ -453,6 +440,40 @@ function getSystemPrompt(nsfw_toggle_prompt, enhance_definitions_prompt, wiBefor
     return whole_prompt;
 }
 
+function tryParseStreamingError(str) {
+    try {
+        const data = JSON.parse(str);
+
+        if (!data) {
+            return;
+        }
+
+        checkQuotaError(data);
+
+        if (data.error) {
+            throw new Error(data);
+        }
+    }
+    catch {
+        // No JSON. Do nothing.
+    }
+}
+
+function checkQuotaError(data) {
+    const errorText = `<h3>You have no credits left to use with this API key.<br>
+    Check your billing details on the
+    <a href="https://platform.openai.com/account/usage" target="_blank">OpenAI website.</a></h3>`;
+
+    if (!data) {
+        return;
+    }
+
+    if (data.quota_error) {
+        callPopup(errorText, 'text');
+        throw new Error(data);
+    }
+}
+
 async function sendOpenAIRequest(openai_msgs_tosend, signal) {
     // Provide default abort signal
     if (!signal) {
@@ -488,10 +509,7 @@ async function sendOpenAIRequest(openai_msgs_tosend, signal) {
     const response = await fetch(generate_url, {
         method: 'POST',
         body: JSON.stringify(generate_data),
-        headers: {
-            'Content-Type': 'application/json',
-            "X-CSRF-Token": token,
-        },
+        headers: getRequestHeaders(),
         signal: signal,
     });
 
@@ -504,9 +522,7 @@ async function sendOpenAIRequest(openai_msgs_tosend, signal) {
                 const { done, value } = await reader.read();
                 let response = decoder.decode(value);
 
-                if (response == "{\"error\":true}") {
-                    throw new Error('error during streaming');
-                }
+                tryParseStreamingError(response);
 
                 let eventList = response.split("\n");
 
@@ -531,6 +547,8 @@ async function sendOpenAIRequest(openai_msgs_tosend, signal) {
     else {
         const data = await response.json();
 
+        checkQuotaError(data);
+
         if (data.error) {
             throw new Error(data);
         }
@@ -546,10 +564,7 @@ async function calculateLogitBias() {
     try {
         const reply = await fetch(`/openai_bias?model=${oai_settings.openai_model}`, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRF-Token': token,
-            },
+            headers: getRequestHeaders(),
             body,
         });
 
@@ -683,6 +698,10 @@ function loadOpenAISettings(data, settings) {
     if (settings.reverse_proxy !== undefined) oai_settings.reverse_proxy = settings.reverse_proxy;
     $('#openai_reverse_proxy').val(oai_settings.reverse_proxy);
 
+    if (oai_settings.reverse_proxy !== '') {
+        $("#ReverseProxyWarningMessage").css('display', 'block');
+    }
+
     $('#openai_logit_bias_preset').empty();
     for (const preset of Object.keys(oai_settings.bias_presets)) {
         const option = document.createElement('option');
@@ -777,10 +796,7 @@ async function saveOpenAIPreset(name, settings) {
 
     const savePresetSettings = await fetch(`/savepreset_openai?name=${name}`, {
         method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRF-Token': token,
-        },
+        headers: getRequestHeaders(),
         body: JSON.stringify(presetBody),
     });
 
@@ -812,7 +828,7 @@ async function showApiKeyUsage() {
     try {
         const response = await fetch('/openai_usage', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': token },
+            headers: getRequestHeaders(),
             body: body,
         });
 
@@ -1208,6 +1224,9 @@ $(document).ready(function () {
 
     $("#openai_reverse_proxy").on('input', function () {
         oai_settings.reverse_proxy = $(this).val();
+        if (oai_settings.reverse_proxy == '') {
+            $("#ReverseProxyWarningMessage").css('display', 'none');
+        } else { $("#ReverseProxyWarningMessage").css('display', 'block'); }
         saveSettingsDebounced();
     });
 

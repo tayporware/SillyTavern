@@ -1,5 +1,5 @@
-import { characters, saveSettingsDebounced, this_chid, selected_button } from "../script.js";
-import { selected_group } from "./group-chats.js";
+import { characters, saveSettingsDebounced, this_chid, selected_button, callPopup } from "../script.js";
+import { group_rm_panel_mode, selected_group } from "./group-chats.js";
 
 export {
     tags,
@@ -58,7 +58,7 @@ function getTagsList(key) {
 }
 
 function getInlineListSelector() {
-    if (selected_group) {
+    if (selected_group && group_rm_panel_mode !== "create") {
         return `.group_select[grid="${selected_group}"] .tags`;
     }
 
@@ -70,7 +70,7 @@ function getInlineListSelector() {
 }
 
 function getTagKey() {
-    if (selected_group) {
+    if (selected_group && group_rm_panel_mode !== "create") {
         return selected_group;
     }
 
@@ -112,8 +112,8 @@ function removeTagFromMap(tagId) {
     }
 }
 
-function findTag(request, resolve) {
-    const skipIds = [...($("#tagList").find(".tag").map((_, el) => $(el).attr("id")))];
+function findTag(request, resolve, listSelector) {
+    const skipIds = [...($(listSelector).find(".tag").map((_, el) => $(el).attr("id")))];
     const haystack = tags.filter(t => !skipIds.includes(t.id)).map(t => t.name).sort();
     const needle = request.term.toLowerCase();
     const hasExactMatch = haystack.findIndex(x => x.toLowerCase() == needle) !== -1;
@@ -126,7 +126,7 @@ function findTag(request, resolve) {
     resolve(result);
 }
 
-function selectTag(event, ui) {
+function selectTag(event, ui, listSelector) {
     let tagName = ui.item.value;
     let tag = tags.find(t => t.name === tagName);
 
@@ -136,13 +136,14 @@ function selectTag(event, ui) {
     }
 
     // unfocus and clear the input
-    $(this).val("").blur();
+    $(event.target).val("").blur();
 
     // add tag to the UI and internal map
-    appendTagToList("#tagList", tag, { removable: true });
+    appendTagToList(listSelector, tag, { removable: true });
     appendTagToList(getInlineListSelector(), tag, { removable: false });
     addTagToMap(tag.id);
     saveSettingsDebounced();
+    printTags();
 
     // need to return false to keep the input clear
     return false;
@@ -190,7 +191,7 @@ function onTagFilterClick() {
 
 function applyFilterToElement(tagId, element) {
     const isTagged = isElementTagged(element, tagId);
-    $(element).css('display', !isTagged ? 'none' : '');
+    $(element).toggleClass('hiddenByTag', !isTagged);
 }
 
 function isElementTagged(element, tagId) {
@@ -205,7 +206,7 @@ function isElementTagged(element, tagId) {
 
 function clearTagsFilter() {
     $('#rm_tag_filter .tag').removeClass('selected');
-    $('#rm_print_characters_block > div').css('display', '');
+    $('#rm_print_characters_block > div').removeClass('hiddenByTag');
 }
 
 function printTags() {
@@ -227,7 +228,7 @@ function onTagRemoveClick(event) {
     tag.remove();
     removeTagFromMap(tagId);
     $(`${getInlineListSelector()} .tag[id="${tagId}"]`).remove();
-    
+
     printTags();
     saveSettingsDebounced();
 }
@@ -242,31 +243,100 @@ function onTagInputFocus() {
     $(this).autocomplete('search', $(this).val());
 }
 
-function onCreateCharacterClick() {
+function onCharacterCreateClick() {
     $("#tagList").empty();
 }
 
+function onGroupCreateClick() {
+    $("#groupTagList").empty();
+}
+
 function onCharacterSelectClick() {
-        clearTagsFilter();
-        const chid = Number($(this).attr('chid'));
-        const key = characters[chid].avatar;
-        const tags = getTagsList(key);
-    
-        $("#tagList").empty();
-    
-        for (const tag of tags) {
-            appendTagToList("#tagList", tag, { removable: true });
-        }
+    clearTagsFilter();
+    const chid = Number($(this).attr('chid'));
+    const key = characters[chid].avatar;
+    const tags = getTagsList(key);
+
+    $("#tagList").empty();
+
+    for (const tag of tags) {
+        appendTagToList("#tagList", tag, { removable: true });
+    }
+}
+
+function onGroupSelectClick() {
+    clearTagsFilter();
+    const key = $(this).attr('grid');
+    const tags = getTagsList(key);
+
+    $("#groupTagList").empty();
+
+    for (const tag of tags) {
+        appendTagToList("#groupTagList", tag, { removable: true });
+    }
+}
+
+function createTagInput(inputSelector, listSelector) {
+    $(inputSelector)
+        .autocomplete({ 
+            source: (i, o) => findTag(i, o, listSelector),
+            select: (e, u) => selectTag(e, u, listSelector),
+            minLength: 0,
+        })
+        .focus(onTagInputFocus); // <== show tag list on click
+}
+
+function onViewTagsListClick() {
+    const list = document.createElement('div');
+    const everything = Object.values(tag_map).flat();
+    $(list).append('<h3>Tags</h3><i>Click on the tag name to edit it.</i>')
+
+    for (const tag of tags) {
+        const count = everything.filter(x => x == tag.id).length;
+        const template = $('#tag_view_template .tag_view_item').clone();
+
+        template.attr('id', tag.id);
+        template.find('.tag_view_counter_value').text(count);
+        template.find('.tag_view_name').text(tag.name);
+
+        list.appendChild(template.get(0));
+    }
+
+    callPopup(list.outerHTML, 'text');
+}
+
+function onTagDeleteClick() {
+    const id = $(this).closest('.tag_view_item').attr('id');
+    for (const key of Object.keys(tag_map)) {
+        tag_map[key] = tag_map[key].filter(x => x.id !== id);
+    }
+    const index = tags.findIndex(x => x.id === id);
+    tags.splice(index, 1);
+    $(`.tag[id="${id}"]`).remove();
+    $(`.tag_view_item[id="${id}"]`).remove();
+    saveSettingsDebounced();
+}
+
+function onTagRenameInput() {
+    const id = $(this).closest('.tag_view_item').attr('id');
+    const newName = $(this).text();
+    const tag = tags.find(x => x.id === id);
+    tag.name = newName;
+    $(`.tag[id="${id}"] .tag_name`).text(newName);
+    saveSettingsDebounced();
 }
 
 $(document).ready(() => {
-    $("#tagInput")
-        .autocomplete({ source: findTag, select: selectTag, minLength: 0, })
-        .focus(onTagInputFocus); // <== show tag list on click
+    createTagInput('#tagInput', '#tagList');
+    createTagInput('#groupTagInput', '#groupTagList');
 
-    $(document).on("click", "#rm_button_create", onCreateCharacterClick);
-    $(document).on("click", ".tag_remove", onTagRemoveClick);
+    $(document).on("click", "#rm_button_create", onCharacterCreateClick);
+    $(document).on("click", "#rm_button_group_chats", onGroupCreateClick);
     $(document).on("click", ".character_select", onCharacterSelectClick);
-
-    $("#tagInput").on("input", onTagInput);
+    $(document).on("click", ".group_select", onGroupSelectClick);
+    $(document).on("click", ".tag_remove", onTagRemoveClick);
+    $(document).on("input", ".tag_input", onTagInput);
+    $(document).on("click", ".tags_view", onViewTagsListClick);
+    $(document).on("click", ".tag_delete", onTagDeleteClick);
+    $(document).on("input", ".tag_view_name", onTagRenameInput);
 });

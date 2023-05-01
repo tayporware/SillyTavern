@@ -1,5 +1,5 @@
-import { saveSettings, callPopup, token, substituteParams, getTokenCount } from "../script.js";
-import { download, debounce } from "./utils.js";
+import { saveSettings, callPopup, substituteParams, getTokenCount, getRequestHeaders } from "../script.js";
+import { download, debounce, delay } from "./utils.js";
 
 export {
     world_info,
@@ -92,10 +92,7 @@ async function loadWorldInfoData() {
 
     const response = await fetch("/getworldinfo", {
         method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-            "X-CSRF-Token": token,
-        },
+        headers: getRequestHeaders(),
         body: JSON.stringify({ name: world_info }),
     });
 
@@ -107,10 +104,7 @@ async function loadWorldInfoData() {
 async function updateWorldInfoList(importedWorldName) {
     var result = await fetch("/getsettings", {
         method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-            "X-CSRF-Token": token,
-        },
+        headers: getRequestHeaders(),
         body: JSON.stringify({}),
     });
 
@@ -157,11 +151,14 @@ function appendWorldEntry(entry) {
     // key
     const keyInput = template.find('textarea[name="key"]');
     keyInput.data("uid", entry.uid);
+    keyInput.on("click", function (event) {
+        // Prevent closing the drawer on clicking the input
+        event.stopPropagation();
+    });
     keyInput.on("input", function () {
         const uid = $(this).data("uid");
         const value = $(this).val();
-        $(this).css("height", ""); //reset the height
-        $(this).css("height", $(this).prop("scrollHeight") + "px");
+        resetScrollHeight(this);
         world_info_data.entries[uid].key = value
             .split(",")
             .map((x) => x.trim())
@@ -169,8 +166,6 @@ function appendWorldEntry(entry) {
         saveWorldInfo();
     });
     keyInput.val(entry.key.join(",")).trigger("input");
-    keyInput.css("height", ""); //reset the height
-    keyInput.css("height", $(this).prop("scrollHeight") + "px");
 
     // keysecondary
     const keySecondaryInput = template.find('textarea[name="keysecondary"]');
@@ -178,8 +173,7 @@ function appendWorldEntry(entry) {
     keySecondaryInput.on("input", function () {
         const uid = $(this).data("uid");
         const value = $(this).val();
-        $(this).css("height", ""); //reset the height
-        $(this).css("height", $(this).prop("scrollHeight") + "px");
+        resetScrollHeight(this);
         world_info_data.entries[uid].keysecondary = value
             .split(",")
             .map((x) => x.trim())
@@ -187,8 +181,6 @@ function appendWorldEntry(entry) {
         saveWorldInfo();
     });
     keySecondaryInput.val(entry.keysecondary.join(",")).trigger("input");
-    keySecondaryInput.css("height", ""); //reset the height
-    keySecondaryInput.css("height", $(this).prop("scrollHeight") + "px");
 
     // comment
     const commentInput = template.find('textarea[name="comment"]');
@@ -196,14 +188,10 @@ function appendWorldEntry(entry) {
     commentInput.on("input", function () {
         const uid = $(this).data("uid");
         const value = $(this).val();
-        $(this).css("height", ""); //reset the height
-        $(this).css("height", $(this).prop("scrollHeight") + "px");
         world_info_data.entries[uid].comment = value;
         saveWorldInfo();
     });
     commentInput.val(entry.comment).trigger("input");
-    commentInput.css("height", ""); //reset the height
-    commentInput.css("height", $(this).prop("scrollHeight") + "px");
 
     // content
     const contentInput = template.find('textarea[name="content"]');
@@ -212,8 +200,6 @@ function appendWorldEntry(entry) {
         const uid = $(this).data("uid");
         const value = $(this).val();
         world_info_data.entries[uid].content = value;
-        $(this).css("height", ""); //reset the height
-        $(this).css("height", $(this).prop("scrollHeight") + "px");
         saveWorldInfo();
 
         // count tokens
@@ -224,8 +210,6 @@ function appendWorldEntry(entry) {
             .html(numberOfTokens);
     });
     contentInput.val(entry.content).trigger("input");
-    contentInput.css("height", ""); //reset the height
-    contentInput.css("height", $(this).prop("scrollHeight") + "px");
 
     // selective
     const selectiveInput = template.find('input[name="selective"]');
@@ -245,6 +229,7 @@ function appendWorldEntry(entry) {
     selectiveInput.siblings(".checkbox_fancy").click(function () {
         $(this).siblings("input").click();
     });
+
 
     // constant
     const constantInput = template.find('input[name="constant"]');
@@ -291,7 +276,22 @@ function appendWorldEntry(entry) {
         .trigger("input");
 
     // display uid
-    template.find(".world_entry_form_uid_value").html(entry.uid);
+    template.find(".world_entry_form_uid_value").text(entry.uid);
+
+    // disable
+    const disableInput = template.find('input[name="disable"]');
+    disableInput.data("uid", entry.uid);
+    disableInput.on("input", function () {
+        const uid = $(this).data("uid");
+        const value = $(this).prop("checked");
+        world_info_data.entries[uid].disable = value;
+        saveWorldInfo();
+        console.log(`WI #${entry.uid} disabled? ${world_info_data.entries[uid].disable}`);
+    });
+    disableInput.prop("checked", entry.disable).trigger("input");
+    disableInput.siblings(".checkbox_fancy").click(function () {
+        $(this).siblings("input").click();
+    });
 
     // delete button
     const deleteButton = template.find("input.delete_entry_button");
@@ -305,6 +305,13 @@ function appendWorldEntry(entry) {
 
     template.appendTo("#world_popup_entries_list");
     return template;
+}
+
+async function resetScrollHeight(element) {
+    await delay(1);
+    const height = Number($(element).prop("scrollHeight")) + 1;
+    $(element).css("height", "");
+    $(element).css("height", `${height}px`);
 }
 
 async function deleteWorldInfoEntry(uid) {
@@ -325,6 +332,7 @@ function createWorldInfoEntry() {
         selective: false,
         order: 100,
         position: 0,
+        disable: false,
     };
     const newUid = getFreeWorldEntryUid();
 
@@ -343,10 +351,7 @@ function createWorldInfoEntry() {
 async function _save() {
     const response = await fetch("/editworldinfo", {
         method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-            "X-CSRF-Token": token,
-        },
+        headers: getRequestHeaders(),
         body: JSON.stringify({ name: world_info, data: world_info_data }),
     });
 }
@@ -360,7 +365,7 @@ async function saveWorldInfo(immediately) {
     if (immediately) {
         return await _save();
     }
-    
+
     saveWorldDebounced();
 }
 
@@ -384,10 +389,7 @@ async function deleteWorldInfo(worldInfoName, selectWorldName) {
 
     const response = await fetch("/deleteworldinfo", {
         method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-            "X-CSRF-Token": token,
-        },
+        headers: getRequestHeaders(),
         body: JSON.stringify({ name: worldInfoName }),
     });
 
@@ -470,19 +472,20 @@ function checkWorldInfo(chat) {
     const sortedEntries = Object.keys(world_info_data.entries)
         .map((x) => world_info_data.entries[x])
         .sort((a, b) => b.order - a.order);
+
     while (needsToScan) {
         let activatedNow = new Set();
 
         for (let entry of sortedEntries) {
-            if (allActivatedEntries.has(entry.uid)) {
+            if (allActivatedEntries.has(entry.uid) && entry.disable == false) {
                 continue;
             }
 
-            if (entry.constant) {
+            if (entry.constant && entry.disable == false) {
                 activatedNow.add(entry.uid);
             }
 
-            if (Array.isArray(entry.key) && entry.key.length) {
+            if (Array.isArray(entry.key) && entry.key.length && entry.disable == false) {
                 primary: for (let key of entry.key) {
                     if (key && textToScan.includes(key.trim().toLowerCase())) {
                         if (
@@ -628,7 +631,7 @@ $(document).ready(() => {
     });
 
     $("#world_popup_delete").click(() => {
-        callPopup("<h3>Delete the World Info?</h3>",  "del_world");
+        callPopup("<h3>Delete the World Info?</h3>", "del_world");
     });
 
     $("#world_popup_new").click(() => {
