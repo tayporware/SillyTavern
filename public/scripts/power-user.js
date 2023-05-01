@@ -478,8 +478,11 @@ async function saveTheme() {
 function resetMovablePanels() {
     document.getElementById("sheld").style.top = '';
     document.getElementById("sheld").style.left = '';
+    document.getElementById("sheld").style.bottom = '';
+    document.getElementById("sheld").style.right = '';
     document.getElementById("sheld").style.height = '';
     document.getElementById("sheld").style.width = '';
+
 
     document.getElementById("left-nav-panel").style.top = '';
     document.getElementById("left-nav-panel").style.left = '';
@@ -498,6 +501,13 @@ function resetMovablePanels() {
     document.getElementById("expression-holder").style.bottom = '';
     document.getElementById("expression-holder").style.height = '';
     document.getElementById("expression-holder").style.width = '';
+
+    document.getElementById("avatar_zoom_popup").style.top = '';
+    document.getElementById("avatar_zoom_popup").style.left = '';
+    document.getElementById("avatar_zoom_popup").style.right = '';
+    document.getElementById("avatar_zoom_popup").style.bottom = '';
+    document.getElementById("avatar_zoom_popup").style.height = '';
+    document.getElementById("avatar_zoom_popup").style.width = '';
 }
 
 $(document).ready(() => {
@@ -704,8 +714,9 @@ $(document).ready(() => {
     });
 
     $('#auto_fix_generated_markdown').on('input', function () {
-         power_user.auto_fix_generated_markdown  = !!$(this).prop('checked');
-         saveSettingsDebounced();
+        power_user.auto_fix_generated_markdown = !!$(this).prop('checked');
+        reloadCurrentChat();
+        saveSettingsDebounced();
     });
 
     $('#auto_scroll_chat_to_bottom').on("input", function () {

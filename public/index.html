@@ -1448,7 +1448,7 @@
 
         <div id="rightNavHolder" class="drawer">
             <div id="unimportantYes" class="drawer-toggle drawer-header">
-                <div id="rightNavDrawerIcon" class="drawer-icon fa-solid fa-id-card  closedIcon" title="Character Management">
+                <div id="rightNavDrawerIcon" class="drawer-icon fa-solid fa-address-card  closedIcon" title="Character Management">
                 </div>
             </div>
             <nav id="right-nav-panel" class="drawer-content closedDrawer fillRight">
@@ -1598,7 +1598,7 @@
                     </div>
                     <div class="flex-container flexFlowColumn flexNoGap overflowYAuto wide100p flexGrow">
                         <div id="rm_group_add_members"></div>
-                        <h3>Members</h3>
+                        <h3>Current Members</h3>
                         <div id="rm_group_members"></div>
                     </div>
                 </div>
@@ -1990,6 +1990,7 @@
             <div class="group_member_icon">
                 <div title="Move up" data-action="up" class="right_menu_button fa-solid fa-xl fa-chevron-up"></div>
                 <div title="Move down" data-action="down" class="right_menu_button fa-solid fa-xl fa-chevron-down"></div>
+                <div title="View character card" data-action="view" class="right_menu_button fa-solid fa-xl fa-id-badge"></div>
                 <div title="Remove from group" data-action="remove" class="right_menu_button fa-solid fa-2xl fa-xmark"></div>
                 <div title="Add to group" data-action="add" class="right_menu_button fa-solid fa-2xl fa-plus"></div>
             </div>
@@ -2083,6 +2084,7 @@
     </div>
 
     <div id="avatar_zoom_popup">
+        <div id="avatar_zoom_popupheader" class="fa-solid fa-grip drag-grabber"></div>
         <img id="zoomed_avatar" src="">
     </div>
 </body>
