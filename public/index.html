@@ -126,6 +126,7 @@
                                         <option value="gpt-3.5-turbo">gpt-3.5-turbo</option>
                                         <option value="gpt-3.5-turbo-0301">gpt-3.5-turbo-0301</option>
                                         <option value="gpt-4">gpt-4</option>
+                                        <option value="gpt-4-0314">gpt-4-0314</option>
                                         <option value="gpt-4-32k">gpt-4-32k</option>
                                     </select>
                                 </div>
@@ -2040,32 +2041,36 @@
     <div id="options" class="font-family-reset">
         <div class="options-content">
             <a id="option_back_to_main">
-                <div class="fa-lg fa-solid fa-left-long"></div>
+                <i class="fa-lg fa-solid fa-left-long"></i>
                 <span>Back to parent chat</span>
             </a>
             <a id="option_new_bookmark">
-                <div class="fa-lg fa-solid fa-bookmark"></div>
+                <i class="fa-lg fa-solid fa-bookmark"></i>
                 <span>Save bookmark</span>
             </a>
+            <a id="option_convert_to_group">
+                <i class="fa-lg fa-solid fa-people-arrows"></i>
+                <span>Convert to group</span>
+            </a>
             <a id="option_start_new_chat">
-                <div class="fa-lg fa-solid fa-comment-dots"></div>
+                <i class="fa-lg fa-solid fa-comment-dots"></i>
                 <span>Start new chat</span>
             </a>
             <a id="option_select_chat">
-                <div class="fa-lg fa-solid fa-address-book"></div>
+                <i class="fa-lg fa-solid fa-address-book"></i>
                 <span>View past chats</span>
             </a>
             <hr>
             <a id="option_delete_mes">
-                <div class="fa-lg fa-solid fa-trash-can"></div>
+                <i class="fa-lg fa-solid fa-trash-can"></i>
                 <span>Delete messages</span>
             </a>
             <a id="option_impersonate" title="Ask AI to write your message for you">
-                <div class="fa-lg fa-solid fa-user-secret"></div>
+                <i class="fa-lg fa-solid fa-user-secret"></i>
                 <span>Impersonate</span>
             </a>
             <a id="option_regenerate">
-                <div class="fa-lg fa-solid fa-repeat "></div>
+                <i class="fa-lg fa-solid fa-repeat"></i>
                 <span>Regenerate</span>
             </a>
         </div>
@@ -2075,6 +2080,10 @@
         <div class="export_format list-group-item" data-format="png">PNG</div>
         <div class="export_format list-group-item" data-format="json">JSON</div>
         <div class="export_format list-group-item" data-format="webp">WEBP</div>
+    </div>
+
+    <div id="avatar_zoom_popup">
+        <img id="zoomed_avatar" src="">
     </div>
 </body>
 
