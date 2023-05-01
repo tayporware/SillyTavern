@@ -221,6 +221,7 @@ let optionsPopper = Popper.createPopper(document.getElementById('send_form'), do
 let exportPopper = Popper.createPopper(document.getElementById('export_button'), document.getElementById('export_format_popup'), {
     placement: 'left'
 });
+
 let dialogueResolve = null;
 let chat_metadata = {};
 let streamingProcessor = null;
@@ -943,7 +944,7 @@ function messageFormating(mes, ch_name, isSystem, forceAvatar) {
 
     if (this_chid != undefined && !isSystem)
         mes = mes.replaceAll("<", "&lt;").replaceAll(">", "&gt;"); //for welcome message
-    if ((this_chid === undefined || this_chid == "invalid-safety-id") && !selected_group) {
+    if ((this_chid === undefined || this_chid === "invalid-safety-id") && !selected_group) {
         mes = mes
             .replace(/\*\*(.+?)\*\*/g, "<b>$1</b>")
             .replace(/\n/g, "<br/>");
@@ -1032,7 +1033,7 @@ function addOneMessage(mes, { type = "normal", insertAfter = null, scroll = true
     if (!mes["is_user"]) {
         if (mes.force_avatar) {
             avatarImg = mes.force_avatar;
-        } else if (this_chid == undefined || this_chid == "invalid-safety-id") {
+        } else if (this_chid === undefined || this_chid === "invalid-safety-id") {
             avatarImg = system_avatar;
         } else {
             if (characters[this_chid].avatar != "none") {
@@ -1171,11 +1172,11 @@ function sendSystemMessage(type, text) {
         newMessage.mes += getSlashCommandsHelp();
     }
 
-    if (!newMessage.extras) {
-        newMessage.extras = {};
+    if (!newMessage.extra) {
+        newMessage.extra = {};
     }
 
-    newMessage.extras.type = type;
+    newMessage.extra.type = type;
 
     chat.push(newMessage);
     addOneMessage(newMessage);
@@ -2158,8 +2159,7 @@ async function Generate(type, automatic_trigger, force_name2) {
 
         } //rungenerate ends
     } else {    //generate's primary loop ends, after this is error handling for no-connection or safety-id
-
-        if (this_chid == undefined || this_chid == 'invalid-safety-id') {
+        if (this_chid === undefined || this_chid === 'invalid-safety-id') {
             //send ch sel
             popup_type = 'char_not_selected';
             callPopup('<h3>Сharacter is not selected</h3>');
@@ -2537,7 +2537,7 @@ async function renameCharacter() {
                     // Async delay to update UI
                     await delay(1);
 
-                    if (this_chid == -1) {
+                    if (this_chid === -1) {
                         throw new Error('New character not selected');
                     }
 
@@ -5401,6 +5401,38 @@ $(document).ready(function () {
         icon.toggleClass('down up');
         icon.toggleClass('fa-circle-chevron-down fa-circle-chevron-up');
         $(this).closest('.inline-drawer').find('.inline-drawer-content').slideToggle();
+    });
+
+    $(document).on('click', '.mes .avatar', function () {
+        let avPopperOrigin = $(this);
+        const avatarPopup = {
+            name: 'offset',
+            options: {
+                offset: [0, 8],
+            },
+        };
+
+        let avatarPopper = Popper.createPopper(document.getElementById('top-settings-holder'), document.getElementById('avatar_zoom_popup'), {
+            modifiers: [avatarPopup],
+        });
+        let thumbURL = $(this).children('img').attr('src');
+        let charsPath = '/characters/'
+        let targetAvatarImg = thumbURL.substring(thumbURL.lastIndexOf("=") + 1);
+        let avatarSrc = charsPath + targetAvatarImg;
+
+        if ($(this).parent().attr('is_user') == 'true') { //handle user avatars
+            $("#zoomed_avatar").attr('src', thumbURL);
+        } else if ($(this).parent().attr('is_system') == 'true') { //handle system avatars
+            $("#zoomed_avatar").attr('src', thumbURL);
+        } else if ($(this).parent().attr('is_user') == 'false') { //handle char avatars
+            $("#zoomed_avatar").attr('src', avatarSrc);
+        }
+
+        $('#avatar_zoom_popup').toggle();
+        avatarPopper.update();
+
+
+
     });
 
     $(document).on('click', '#OpenAllWIEntries', function () {
