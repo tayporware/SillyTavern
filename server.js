@@ -1618,7 +1618,7 @@ app.post("/importchat", urlencodedParser, function (request, response) {
             rl.once('line', (line) => {
                 let jsonData = json5.parse(line);
 
-                if (jsonData.user_name !== undefined) {
+                if (jsonData.user_name !== undefined || jsonData.name !== undefined) {
                     //console.log(humanizedISO8601DateTime()+':/importchat copying chat as '+ch_name+' - '+humanizedISO8601DateTime()+'.jsonl');
                     fs.copyFile('./uploads/' + filedata.filename, chatsPath + avatar_url + '/' + ch_name + ' - ' + humanizedISO8601DateTime() + '.jsonl', (err) => { //added character name and replaced Date.now() with humanizedISO8601DateTime
                         if (err) {
@@ -1630,7 +1630,7 @@ app.post("/importchat", urlencodedParser, function (request, response) {
                         }
                     });
                 } else {
-                    //response.send({error:true});
+                    response.send({error:true});
                     return;
                 }
                 rl.close();
@@ -2294,6 +2294,7 @@ app.post("/generate_openai", jsonParser, function (request, response_generate_op
                 response_generate_openai.send({ error: true, quota_error });
             } catch (error) {
                 console.error(error);
+                return response_generate_openai.send({ error: true });
             }
         });
 });
