@@ -268,7 +268,11 @@
                                     </div>
                                     <div class="range-block-counter">
                                         Alternative server URL (leave empty to use the default value).<br>
-                                        <b class="reverse_proxy_warning">Don't expose your real API keys to reverse proxies!</b>
+                                        <div id="ReverseProxyWarningMessage" class="reverse_proxy_warning">
+                                            <b>Remove your real OAI API Key from the API panel BEFORE typing anything into this box.</b>
+                                            <hr>
+                                            <b>We cannot provide support for problems encountered while using an unofficial OpenAI proxy.</b>
+                                        </div>
                                     </div>
                                     <div class="wide100p">
                                         <input id="openai_reverse_proxy" type="text" class="text_pole" placeholder="https://api.openai.com/v1" maxlength="100" />
@@ -1343,6 +1347,13 @@
                                 <input id="auto_scroll_chat_to_bottom" type="checkbox" />
                                 Auto-scroll Chat
                             </label>
+                            <label for="render_formulas">
+                                <input id="render_formulas" type="checkbox" />
+                                Render Formulas
+                                <a href="/notes#formulasrendering" class="notes-link" target="_blank">
+                                    <span class="note-link-span">?</span>
+                                </a>
+                            </label>
                             <div class="flex-container flexFlowColumn">
                                 <h4>
                                     Send on Enter
@@ -1358,11 +1369,12 @@
 
                     <div name="NameAndAvatar" class="flex-container flexFlowColumn drawer25pWidth">
                         <div name="NameChanger">
-                            <form id='form_change_name' action="javascript:void(null);" method="post" enctype="multipart/form-data">
-                                <h4>Name</h4>
+                            <h4>Name</h4>
+                            <div class="change_name">
                                 <input id="your_name" name="your_name" class="text_pole" maxlength="50" value="" autocomplete="off">
-                                <input id="your_name_button" class="menu_button" type="submit" title="Click to set a new User Name (reloads page)" value="Update">
-                            </form>
+                                <div id="your_name_button" class="menu_button fa-solid fa-check" title="Click to set a new User Name">
+                                </div>
+                            </div>
                         </div>
                         <div name="AvatarSelector">
                             <h4>Your Avatar</h4>
@@ -1491,7 +1503,10 @@
                         <hr>
 
                         <div id="tags_div">
-                            <input id="tagInput" class="text_pole tag_input" placeholder="Search / Create tags" maxlength="25" />
+                            <div class="tag_controls">
+                                <input id="tagInput" class="text_pole tag_input" placeholder="Search / Create tags" maxlength="25" />
+                                <div class="tags_view menu_button fa-solid fa-pen-to-square" title="View all tags"></div>
+                            </div>
                             <div id="tagList" class="tags"></div>
                         </div>
 
@@ -1570,7 +1585,10 @@
                         </div>
                     </div>
                     <div id="group_tags_div" class="wide100p">
-                        <input id="groupTagInput" class="text_pole tag_input" placeholder="Search / Create tags" maxlength="25" />
+                        <div class="tag_controls">
+                            <input id="groupTagInput" class="text_pole tag_input flex1" placeholder="Search / Create tags" maxlength="25" />
+                            <div class="tags_view menu_button fa-solid fa-pen-to-square" title="View all tags"></div>
+                        </div>
                         <div id="groupTagList" class="tags"></div>
                     </div>
                     <div id="rm_group_add_members_header">
@@ -1717,6 +1735,7 @@
                         <a href="/notes#worldinfoentry" class="notes-link" target="_blank"><span class="note-link-span">?</span></a>
                     </h3>
                 </div>
+                <div id="OpenAllWIEntries" class="menu_button fa-solid fa-expand"></div>
                 <div class="world_popup_expander">&nbsp;</div>
                 <form id="form_rename_world" action="javascript:void(null);" method="post" enctype="multipart/form-data">
                     <input id="world_popup_name" name="world_popup_name" class="text_pole" maxlength="99" size="32" value="" autocomplete="off">
@@ -1765,86 +1784,119 @@
 
     <!-- templates for JS to reuse when needed -->
 
+    <div id="tag_view_template" class="template_element">
+        <div class="tag_view_item">
+            <div class="tag_view_name" contenteditable="true"></div>
+            <div class="tag_view_counter"><span class="tag_view_counter_value"></span>&nbsp;entries</div>
+            <div title="Delete tag" class="tag_delete fa-solid fa-trash-can right_menu_button"></div>
+        </div>
+    </div>
+
     <div id="entry_edit_template" class="template_element">
         <div class="world_entry">
             <form class="world_entry_form">
-                <div class="world_entry_thin_controls">
-                    <div class="world_entry_form_control">
-                        <label for="key">
-                            <h4>Key</h4>
-                            <h5>Comma-separated list of keywords (e.g: foo,bar).</h5>
-                        </label>
-                        <textarea class="text_pole" name="key" rows="1" placeholder="" maxlength="250"></textarea>
-                    </div>
-                    <div class="world_entry_form_control keysecondary">
-                        <label for="keysecondary">
-                            <h4>Secondary Key</h4>
-                            <h5>Comma-separated list of additional keywords.</h5>
-                        </label>
-                        <textarea class="text_pole" name="keysecondary" rows="1" placeholder="" maxlength="250"></textarea>
-                    </div>
-                </div>
-                <div class="world_entry_thin_controls">
-                    <div class="world_entry_form_control">
-                        <label for="order">
-                            <h4>Insertion Order</h4>
-                            <h5>Higher order number entries will be inserted first.</h5>
-                        </label>
-                        <input class="text_pole" type="number" name="order" placeholder="" />
-                    </div>
-                    <div class="world_entry_form_control">
-                        <label for="comment">
-                            <h4>Comment</h4>
-                            <h5>Optional comment (doesn't affect the AI).</h5>
-                        </label>
-                        <textarea class="text_pole" rows="1" name="comment" maxlength="250"></textarea>
-                    </div>
-                </div>
-                <div class="world_entry_form_control">
-                    <label for="content">
-                        <h4>Content</h4>
-                        <h5>Text that will be inserted to the prompt upon activation.</h5>
-                    </label>
-                    <textarea class="text_pole" name="content" rows="4" placeholder=""></textarea>
-                </div>
-                <div class="world_entry_form_control world_entry_form_horizontal">
-                    <label class="checkbox">
-                        <input type="checkbox" name="constant" />
-                        <h4>Constant</h4>
-                    </label>
-                    <label class="checkbox">
-                        <input type="checkbox" name="selective" />
-                        <h4>Selective</h4>
-                    </label>
-                    <div class="world_entry_form_control world_entry_form_radios">
-                        <div>
-                            <label><input type="radio" name="position" value="0">
-                                <h4>Before Chara</h4>
-                            </label>
+                <div class="inline-drawer wide100p">
+                    <div class="inline-drawer-toggle inline-drawer-header">
+                        <div class="world_entry_thin_controls wide100p">
+                            <div class="world_entry_form_control">
+                                <label for="key">
+                                    <h4>Keywords</h4>
+                                    <h5>Seperate by commas</h5>
+                                </label>
+                                <textarea class="text_pole" name="key" rows="1" placeholder="" maxlength="250"></textarea>
+                            </div>
+                            <div class="world_entry_form_control keysecondary">
+                                <label for="keysecondary">
+                                    <h4>Secondary Required Keywords</h4>
+                                    <h5>Separate by commas</h5>
+                                </label>
+                                <textarea class="text_pole" name="keysecondary" rows="1" placeholder="" maxlength="250"></textarea>
+                            </div>
                         </div>
-                        <div>
-                            <label><input type="radio" name="position" value="1">
-                                <h4>After Chara</h4>
-                            </label>
+                        <div class="fa-solid fa-circle-chevron-down inline-drawer-icon down"></div>
+                    </div>
+                    <div class="inline-drawer-content">
+                        <div class="world_entry_thin_controls  wide100p">
+                            <div class="world_entry_form_control">
+                                <label for="content ">
+                                    <h4>Content</h4>
+                                    <h5>What this keyword should mean to the AI</h5>
+                                </label>
+                                <textarea class="text_pole" name="content" rows="4" placeholder=""></textarea>
+                            </div>
+                        </div>
+                        <div class="world_entry_thin_controls  wide100p">
+
+                            <div class="world_entry_form_control">
+                                <label for="comment">
+                                    <h4>Memo/Note</h4>
+                                    <h5>Not sent to AI</h5>
+                                </label>
+                                <textarea class="text_pole" rows="1" name="comment" maxlength="250"></textarea>
+                            </div>
+                        </div>
+
+
+                        <div class="world_entry_form_control world_entry_form_horizontal">
+                            <div class="flex-container flexFlowColumn flexNoGap  wi-enter-footer-text ">
+                                <label class="checkbox">
+                                    <input type="checkbox" name="constant" />
+                                    <span>Constant</span>
+                                </label>
+                                <label class="checkbox">
+                                    <input type="checkbox" name="selective" />
+                                    <span>Selective</span>
+                                </label>
+                            </div>
+                            <div class="world_entry_form_control world_entry_form_radios  wi-enter-footer-text">
+                                <div>
+                                    <label><input type="radio" name="position" value="0">
+                                        <span>Before Char</span>
+                                    </label>
+                                </div>
+                                <div>
+                                    <label><input type="radio" name="position" value="1">
+                                        <span>After Char</span>
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="world_entry_form_control wi-enter-footer-text flex-container flexNoGap "> <!-- world_entry_form_control -->
+                                <!-- <label for="order"> -->
+
+                                Insertion Order
+                                <!-- Bigger number = inserted earlier -->
+
+                                <!-- </label> -->
+                                <input class="text_pole wide50px" type="number" name="order" placeholder="" />
+                            </div>
+
+
+                            <div class="flex-container flexFlowColumn flexNoGap  wi-enter-footer-text">
+                                <div class="world_entry_form_uid">
+                                    UID:
+                                    &nbsp;
+                                    <span class="world_entry_form_uid_value"></span>
+                                </div>
+                                <div class="world_entry_form_tokens">
+                                    Tokens:
+                                    &nbsp;
+                                    <span class="world_entry_form_token_counter">0</span>
+                                </div>
+                            </div>
+                            <div>
+                                <label class="checkbox">
+                                    <input type="checkbox" name="disable" />
+                                    <span>Disable</span>
+                                </label>
+                            </div>
+                            <span class="world_popup_expander">&nbsp;</span>
+                            <input class="menu_button delete_entry_button" type="submit" value="Delete Entry" />
                         </div>
                     </div>
-                    <span class="world_popup_expander">&nbsp;</span>
-                    <h5 class="world_entry_form_uid">
-                        UID:
-                        &nbsp;
-                        <span class="world_entry_form_uid_value"></span>
-                    </h5>
-                    <h5 class="world_entry_form_tokens">
-                        Tokens used:
-                        &nbsp;
-                        <span class="world_entry_form_token_counter">0</span>
-                    </h5>
-                    <input class="menu_button delete_entry_button" type="submit" value="Delete Entry" />
                 </div>
             </form>
         </div>
     </div>
-
     <div id="character_template" class="template_element">
         <div class="character_select flex-container wide100p alignitemsflexstart" chid="" id="">
             <div class="avatar" title="">
@@ -1976,7 +2028,7 @@
                 <textarea id="send_textarea" placeholder="Not connected to API!" name="text"></textarea>
                 <div id="send_but_sheld">
                     <div id="loading_mes">
-                        <div alt="" class="fa-solid fa-fade fa-hourglass-half"></div>
+                        <div alt="" class="fa-solid fa-hourglass-half"></div>
                     </div>
                     <div id="send_but" class="fa-solid fa-feather-pointed"></div>
                 </div>

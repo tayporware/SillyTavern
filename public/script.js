@@ -39,6 +39,8 @@ import {
     select_group_chats,
     regenerateGroup,
     group_generation_id,
+    getGroupChat,
+    renameGroupMember,
 } from "./scripts/group-chats.js";
 
 import {
@@ -81,6 +83,7 @@ import {
     checkHordeStatus,
     getHordeModels,
     adjustHordeGenerationParams,
+    MIN_AMOUNT_GEN,
 } from "./scripts/horde.js";
 
 import {
@@ -99,7 +102,6 @@ import {
     tags,
     loadTagsSettings,
     printTags,
-    isElementTagged,
     getTagsList,
     appendTagToList,
     createTagMapFromList,
@@ -146,6 +148,7 @@ export {
     getThumbnailUrl,
     getStoppingStrings,
     getStatus,
+    reloadMarkdownProcessor,
     chat,
     this_chid,
     selected_button,
@@ -176,19 +179,11 @@ window["SillyTavern"] = {};
 
 const gpt3 = new GPT3BrowserTokenizer({ type: 'gpt3' });
 hljs.addPlugin({ "before:highlightElement": ({ el }) => { el.textContent = el.innerText } });
-let converter = new showdown.Converter({
-    emoji: "true",
-    underline: "true",
-    extensions: [
-        showdownKatex(
-            {
-                delimiters: [
-                    { left: '$$', right: '$$', display: true, asciimath: false },
-                    { left: '$', right: '$', display: false, asciimath: true },
-                ]
-            }
-        )],
-});
+
+// Markdown converter
+let converter;
+reloadMarkdownProcessor();
+
 /* let bg_menu_toggle = false; */
 const systemUserName = "SillyTavern System";
 let default_user_name = "You";
@@ -201,7 +196,7 @@ let safetychat = [
         is_user: false,
         is_name: true,
         create_date: 0,
-        mes: "\n*You deleted a character/chat and arrived back here for safety reasons! Pick another character!*\n\n",
+        mes: "You deleted a character/chat and arrived back here for safety reasons! Pick another character!",
     },
 ];
 let chat_create_date = 0;
@@ -388,6 +383,31 @@ function getTokenCount(str, padding = 0) {
     }
 }
 
+function reloadMarkdownProcessor(render_formulas = false) {
+    if (render_formulas) {
+        converter = new showdown.Converter({
+            emoji: "true",
+            underline: "true",
+            extensions: [
+                showdownKatex(
+                    {
+                        delimiters: [
+                            { left: '$$', right: '$$', display: true, asciimath: false },
+                            { left: '$', right: '$', display: false, asciimath: true },
+                        ]
+                    }
+                )],
+        });
+    }
+    else {
+        converter = new showdown.Converter({
+            emoji: "true",
+        });
+    }
+
+    return converter;
+}
+
 const CHARACTERS_PER_TOKEN_RATIO = 3.35;
 const talkativeness_default = 0.5;
 
@@ -473,7 +493,7 @@ var colab_ini_step = 1;
 
 let token;
 
-function getRequestHeaders() {
+export function getRequestHeaders() {
     return {
         "Content-Type": "application/json",
         "X-CSRF-Token": token,
@@ -516,16 +536,6 @@ $.get("/csrf-token").then((data) => {
     getBackgrounds();
     getUserAvatars();
 });
-
-///////////// UNUSED FUNCTIONS MOVED TO TOP ///////////////
-
-function newMesPattern(name) {
-    //Patern which denotes a new message
-    name = name + ":";
-    return name;
-}
-
-//////////////////////////////////////////
 
 function checkOnlineStatus() {
     ///////// REMOVED LINES THAT DUPLICATE RA_CHeckOnlineStatus FEATURES 
@@ -722,7 +732,6 @@ function printCharacters() {
 }
 
 async function getCharacters() {
-    await getGroups();
     var response = await fetch("/getcharacters", {
         method: "POST",
         headers: getRequestHeaders(),
@@ -742,6 +751,7 @@ async function getCharacters() {
         if (this_chid != undefined && this_chid != "invalid-safety-id") {
             $("#avatar_url_pole").val(characters[this_chid].avatar);
         }
+        await getGroups();
         printCharacters();
     }
 }
@@ -906,6 +916,22 @@ function deleteLastMessage() {
     $('#chat').children('.mes').last().remove();
 }
 
+export async function reloadCurrentChat() {
+    clearChat();
+    chat.length = 0;
+
+    if (selected_group) {
+        await getGroupChat(selected_group);
+    }
+    else if (this_chid) {
+        await getChat();
+    }
+    else {
+        resetChatState();
+        printMessages();
+    }
+}
+
 function messageFormating(mes, ch_name, isSystem, forceAvatar) {
     if (!mes) {
         mes = '';
@@ -917,14 +943,14 @@ function messageFormating(mes, ch_name, isSystem, forceAvatar) {
 
     if (this_chid != undefined && !isSystem)
         mes = mes.replaceAll("<", "&lt;").replaceAll(">", "&gt;"); //for welcome message
-    if (this_chid === undefined && !selected_group) {
+    if ((this_chid === undefined || this_chid == "invalid-safety-id") && !selected_group) {
         mes = mes
             .replace(/\*\*(.+?)\*\*/g, "<b>$1</b>")
             .replace(/\n/g, "<br/>");
     } else if (!isSystem) {
         mes = mes.replace(/```[\s\S]*?```|``[\s\S]*?``|`[\s\S]*?`|(\".+?\")/gm, function (match, p1) {
             if (p1) {
-                return "<q>" + p1.replace(/\"/g, "") + "</q>";
+                return '<q>"' + p1.replace(/\"/g, "") + '"</q>';
             } else {
                 return match;
             }
@@ -952,12 +978,14 @@ function messageFormating(mes, ch_name, isSystem, forceAvatar) {
     return mes;
 }
 
-function getMessageFromTemplate(mesId, characterName, isUser, avatarImg, bias, isSystem) {
+function getMessageFromTemplate(mesId, characterName, isUser, avatarImg, bias, isSystem, title) {
     const mes = $('#message_template .mes').clone();
     mes.attr({ 'mesid': mesId, 'ch_name': characterName, 'is_user': isUser, 'is_system': !!isSystem });
     mes.find('.avatar img').attr('src', avatarImg);
     mes.find('.ch_name .name_text').text(characterName);
     mes.find('.mes_bias').html(bias);
+    title && mes.attr('title', title);
+
     return mes;
 }
 
@@ -965,7 +993,7 @@ function appendImageToMessage(mes, messageElement) {
     if (mes.extra?.image) {
         const image = document.createElement("img");
         image.src = mes.extra?.image;
-        image.title = mes.title;
+        image.title = mes.extra?.title || mes.title;
         image.classList.add("img_extra");
         messageElement.find(".mes_text").prepend(image);
     }
@@ -999,6 +1027,7 @@ function addOneMessage(mes, { type = "normal", insertAfter = null, scroll = true
     var characterName = name1;
     var avatarImg = "User Avatars/" + user_avatar;
     const isSystem = mes.is_system;
+    const title = mes.title;
     generatedPromtCache = "";
     if (!mes["is_user"]) {
         if (mes.force_avatar) {
@@ -1030,7 +1059,7 @@ function addOneMessage(mes, { type = "normal", insertAfter = null, scroll = true
     );
     const bias = messageFormating(mes.extra?.bias ?? "");
 
-    var HTMLForEachMes = getMessageFromTemplate(count_view_mes, characterName, mes.is_user, avatarImg, bias, isSystem);
+    var HTMLForEachMes = getMessageFromTemplate(count_view_mes, characterName, mes.is_user, avatarImg, bias, isSystem, title);
 
     if (type !== 'swipe') {
         if (!insertAfter) {
@@ -1060,12 +1089,13 @@ function addOneMessage(mes, { type = "normal", insertAfter = null, scroll = true
     });
 
     if (type === 'swipe') {
-        $("#chat").children().filter('[mesid="' + (count_view_mes - 1) + '"]').children('.mes_block').children('.mes_text').html('');
-        $("#chat").children().filter('[mesid="' + (count_view_mes - 1) + '"]').children('.mes_block').children('.mes_text').append(messageText);
+        $("#chat").children().filter(`[mesid="${count_view_mes - 1}"]`).children('.mes_block').children('.mes_text').html('');
+        $("#chat").children().filter(`[mesid="${count_view_mes - 1}"]`).children('.mes_block').children('.mes_text').append(messageText);
+        $("#chat").children().filter(`[mesid="${count_view_mes - 1}"]`).attr('title', title);
 
         //console.log(mes);
     } else {
-        $("#chat").children().filter('[mesid="' + count_view_mes + '"]').children('.mes_block').children('.mes_text').append(messageText);
+        $("#chat").children().filter(`[mesid="${count_view_mes}"]`).children('.mes_block').children('.mes_text').append(messageText);
         hideSwipeButtons();
         count_view_mes++;
     }
@@ -1182,12 +1212,20 @@ function cleanGroupMessage(getMessage) {
 
     if (group && Array.isArray(group.members) && group.members) {
         for (let member of group.members) {
-            // Skip current speaker.
-            if (member === name2) {
+            const character = characters.find(x => x.avatar == member);
+
+            if (!character) {
                 continue;
             }
 
-            const indexOfMember = getMessage.indexOf(member + ":");
+            const name = character.name;
+
+            // Skip current speaker.
+            if (name === name2) {
+                continue;
+            }
+
+            const indexOfMember = getMessage.indexOf(`${name}:`);
             if (indexOfMember != -1) {
                 getMessage = getMessage.substr(0, indexOfMember);
             }
@@ -1430,11 +1468,11 @@ async function Generate(type, automatic_trigger, force_name2) {
         return;
     }
 
-    if (isStreamingEnabled()) {
-        streamingProcessor = new StreamingProcessor(type, force_name2);
+    streamingProcessor = isStreamingEnabled() ? new StreamingProcessor(type, force_name2) : false;
+
+    // Hide swipes on either multigen or real streaming
+    if (isStreamingEnabled() || isMultigenEnabled()) {
         hideSwipeButtons();
-    } else {
-        streamingProcessor = false;
     }
 
     if (selected_group && !is_group_generating) {
@@ -1704,6 +1742,9 @@ async function Generate(type, automatic_trigger, force_name2) {
                 if (canFitMessages()) {
                     count_exm_add++;
                 } else {
+                    // doesn't fit, so remove
+                    examplesString.slice(examplesString.length - example.length,)
+                    count_exm_add--;
                     break;
                 }
                 await delay(1);
@@ -1925,6 +1966,7 @@ async function Generate(type, automatic_trigger, force_name2) {
 
             if (main_api == 'kobold' && horde_settings.use_horde && hordeAmountGen) {
                 this_amount_gen = Math.min(this_amount_gen, hordeAmountGen);
+                this_amount_gen = Math.max(this_amount_gen, MIN_AMOUNT_GEN); // prevent validation errors
             }
 
             let generate_data;
@@ -2020,12 +2062,12 @@ async function Generate(type, automatic_trigger, force_name2) {
             }
 
             function onSuccess(data) {
-                tokens_already_generated += this_amount_gen;            // add new gen amt to any prev gen counter..
 
                 is_send_press = false;
                 if (!data.error) {
                     //const getData = await response.json();
-                    let getMessage = extractMessageFromData(data, finalPromt);
+                    let getMessage = extractMessageFromData(data);
+                    let title = extractTitleFromData(data);
 
                     //Pygmalion run again
                     // to make it continue generating so long as it's under max_amount and hasn't signaled
@@ -2036,15 +2078,16 @@ async function Generate(type, automatic_trigger, force_name2) {
                         if (shouldContinueMultigen(getMessage)) {
                             let this_mes_is_name;
                             ({ this_mes_is_name, getMessage } = extractNameFromMessage(getMessage, force_name2, isImpersonate));
-                            if (generate_loop_counter == 0) {
+                            if (tokens_already_generated == 0) {
                                 console.log("New message");
-                                ({ type, getMessage } = saveReply(type, getMessage, this_mes_is_name));
+                                ({ type, getMessage } = saveReply(type, getMessage, this_mes_is_name, title));
                             }
                             else {
                                 console.log("Should append message");
-                                ({ type, getMessage } = saveReply('append', getMessage, this_mes_is_name));
+                                ({ type, getMessage } = saveReply('append', getMessage, this_mes_is_name, title));
                             }
-                            generate_loop_counter++;
+                            hideSwipeButtons();
+                            tokens_already_generated += this_amount_gen;            // add new gen amt to any prev gen counter..
                             getMessage = message_already_generated;
                             runGenerate(getMessage);
                             console.log('returning to make generate again');
@@ -2059,17 +2102,16 @@ async function Generate(type, automatic_trigger, force_name2) {
 
                     let this_mes_is_name;
                     ({ this_mes_is_name, getMessage } = extractNameFromMessage(getMessage, force_name2, isImpersonate));
-                    //getMessage = getMessage.replace(/^\s+/g, '');
                     if (getMessage.length > 0) {
                         if (isImpersonate) {
                             $('#send_textarea').val(getMessage).trigger('input');
                         }
                         else {
                             if (!isMultigenEnabled()) {
-                                ({ type, getMessage } = saveReply(type, getMessage, this_mes_is_name));
+                                ({ type, getMessage } = saveReply(type, getMessage, this_mes_is_name, title));
                             }
                             else {
-                                ({ type, getMessage } = saveReply('appendFinal', getMessage, this_mes_is_name));
+                                ({ type, getMessage } = saveReply('appendFinal', getMessage, this_mes_is_name, title));
                             }
                         }
                         activateSendButtons();
@@ -2230,6 +2272,14 @@ function throwCircuitBreakerError() {
     throw new Error('Generate circuit breaker interruption');
 }
 
+function extractTitleFromData(data) {
+    if (main_api == 'kobold' && horde_settings.use_horde) {
+        return data.workerName;
+    }
+
+    return undefined;
+}
+
 function extractMessageFromData(data) {
     let getMessage = "";
 
@@ -2238,7 +2288,7 @@ function extractMessageFromData(data) {
     }
 
     if (main_api == 'kobold' && horde_settings.use_horde) {
-        getMessage = data;
+        getMessage = data.text;
     }
 
     if (main_api == 'textgenerationwebui') {
@@ -2311,7 +2361,7 @@ function cleanUpMessage(getMessage, isImpersonate) {
     return getMessage;
 }
 
-function saveReply(type, getMessage, this_mes_is_name) {
+function saveReply(type, getMessage, this_mes_is_name, title) {
     if (type != 'append' && type != 'appendFinal' && chat.length && (chat[chat.length - 1]['swipe_id'] === undefined ||
         chat[chat.length - 1]['is_user'])) {
         type = 'normal';
@@ -2321,21 +2371,22 @@ function saveReply(type, getMessage, this_mes_is_name) {
     getMessage = img.getMessage;
 
     if (type === 'swipe') {
-        chat[chat.length - 1]['swipes'][chat[chat.length - 1]['swipes'].length] = getMessage;
+        chat[chat.length - 1]['swipes'].length++;
         if (chat[chat.length - 1]['swipe_id'] === chat[chat.length - 1]['swipes'].length - 1) {
-            //console.log(getMessage);
+            chat[chat.length - 1]['title'] = title;
             chat[chat.length - 1]['mes'] = getMessage;
-            // console.log('runGenerate calls addOneMessage for swipe');
             addOneMessage(chat[chat.length - 1], { type: 'swipe' });
         } else {
             chat[chat.length - 1]['mes'] = getMessage;
         }
     } else if (type === 'append') {
         console.log("Trying to append.")
+        chat[chat.length - 1]['title'] = title;
         chat[chat.length - 1]['mes'] += getMessage;
         addOneMessage(chat[chat.length - 1], { type: 'swipe' });
     } else if (type === 'appendFinal') {
-        console.log("Trying to append.")
+        console.log("Trying to appendFinal.")
+        chat[chat.length - 1]['title'] = title;
         chat[chat.length - 1]['mes'] = getMessage;
         addOneMessage(chat[chat.length - 1], { type: 'swipe' });
 
@@ -2349,6 +2400,7 @@ function saveReply(type, getMessage, this_mes_is_name) {
         chat[chat.length - 1]['send_date'] = humanizedDateTime();
         getMessage = $.trim(getMessage);
         chat[chat.length - 1]['mes'] = getMessage;
+        chat[chat.length - 1]['title'] = title;
 
         if (selected_group) {
             console.log('entering chat update for groups');
@@ -2358,12 +2410,19 @@ function saveReply(type, getMessage, this_mes_is_name) {
             }
             chat[chat.length - 1]['is_name'] = true;
             chat[chat.length - 1]['force_avatar'] = avatarImg;
+            chat[chat.length - 1]['original_avatar'] = characters[this_chid].avatar;
             chat[chat.length - 1]['extra']['gen_id'] = group_generation_id;
         }
 
         saveImageToMessage(img, chat[chat.length - 1]);
         addOneMessage(chat[chat.length - 1]);
     }
+
+    const item = chat[chat.length - 1];
+    if (item['swipe_id'] !== undefined) {
+        item['swipes'][item['swipes'].length - 1] = item['mes'];
+    }
+
     return { type, getMessage };
 }
 
@@ -2373,7 +2432,7 @@ function saveImageToMessage(img, mes) {
             mes.extra = {};
         }
         mes.extra.image = img.image;
-        mes.title = img.title;
+        mes.extra.title = img.title;
     }
 }
 
@@ -2482,6 +2541,8 @@ async function renameCharacter() {
                         throw new Error('New character not selected');
                     }
 
+                    // Also rename as a group member
+                    await renameGroupMember(oldAvatar, newAvatar, newValue);
                     callPopup('<h3>Character renamed!</h3>Sprites folder (if any) should be renamed manually.', 'text');
                 }
                 else {
@@ -3539,8 +3600,8 @@ function showSwipeButtons() {
 
 function hideSwipeButtons() {
     //console.log('hideswipebuttons entered');
-    $("#chat").children().filter('[mesid="' + (count_view_mes - 1) + '"]').children('.swipe_right').css('display', 'none');
-    $("#chat").children().filter('[mesid="' + (count_view_mes - 1) + '"]').children('.swipe_left').css('display', 'none');
+    $("#chat").children().filter(`[mesid="${count_view_mes - 1}"]`).children('.swipe_right').css('display', 'none');
+    $("#chat").children().filter(`[mesid="${count_view_mes - 1}"]`).children('.swipe_left').css('display', 'none');
 }
 
 function saveChatConditional() {
@@ -5340,6 +5401,10 @@ $(document).ready(function () {
         icon.toggleClass('down up');
         icon.toggleClass('fa-circle-chevron-down fa-circle-chevron-up');
         $(this).closest('.inline-drawer').find('.inline-drawer-content').slideToggle();
+    });
+
+    $(document).on('click', '#OpenAllWIEntries', function () {
+        $("#world_popup_entries_list").children().find('.inline-drawer-header').click()
     });
 
     $(document).keyup(function (e) {

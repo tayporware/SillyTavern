@@ -1739,7 +1739,7 @@ app.post('/creategroup', jsonParser, (request, response) => {
     }
 
     const id = Date.now();
-    const chatMetadata = {
+    const groupMetadata = {
         id: id,
         name: request.body.name ?? 'New Group',
         members: request.body.members ?? [],
@@ -1748,16 +1748,18 @@ app.post('/creategroup', jsonParser, (request, response) => {
         activation_strategy: request.body.activation_strategy ?? 0,
         chat_metadata: request.body.chat_metadata ?? {},
         fav: request.body.fav,
+        chat_id: request.body.chat_id ?? id,
+        chats: request.body.chats ?? [id],
     };
     const pathToFile = path.join(directories.groups, `${id}.json`);
-    const fileData = JSON.stringify(chatMetadata);
+    const fileData = JSON.stringify(groupMetadata);
 
     if (!fs.existsSync(directories.groups)) {
         fs.mkdirSync(directories.groups);
     }
 
     fs.writeFileSync(pathToFile, fileData);
-    return response.send(chatMetadata);
+    return response.send(groupMetadata);
 });
 
 app.post('/editgroup', jsonParser, (request, response) => {
@@ -2263,6 +2265,9 @@ app.post("/generate_openai", jsonParser, function (request, response_generate_op
             } else if (response.status == 402) {
                 console.log('An active subscription is required to access this endpoint');
                 response_generate_openai.send({ error: true });
+            } else if (response.status == 429) {
+                console.log('Out of quota');
+                response_generate_openai.send({ error: true, quota_error: true, });
             } else if (response.status == 500 || response.status == 409 || response.status == 504) {
                 if (request.body.stream) {
                     response.data.on('data', chunk => {
@@ -2285,7 +2290,8 @@ app.post("/generate_openai", jsonParser, function (request, response_generate_op
                 }
             }
             try {
-                response_generate_openai.send({ error: true });
+                const quota_error = error.response.status == 429;
+                response_generate_openai.send({ error: true, quota_error });
             } catch (error) {
                 console.error(error);
             }
