@@ -100,6 +100,8 @@ let power_user = {
     auto_fix_generated_markdown: true,
     send_on_enter: send_on_enter_options.AUTO,
     render_formulas: false,
+
+    absoluteRPGAdventure: false,
 };
 
 let themes = [];
@@ -403,6 +405,8 @@ function loadPowerUserSettings(settings, data) {
     $(`#character_sort_order option[data-order="${power_user.sort_order}"][data-field="${power_user.sort_field}"]`).prop("selected", true);
     sortCharactersList();
     reloadMarkdownProcessor(power_user.render_formulas);
+
+    $("#absoluteRPGAdventure").prop("checked", power_user.absoluteRPGAdventure);   
 }
 
 function sortCharactersList(selector = '.character_select') {
@@ -746,6 +750,11 @@ $(document).ready(() => {
         reloadCurrentChat();
         saveSettingsDebounced();
     })
+
+    $("#absoluteRPGAdventure").on('input', function () {
+        power_user.absoluteRPGAdventure = !!$(this).prop('checked');
+        saveSettingsDebounced();
+    });
 
     $(window).on('focus', function () {
         browser_has_focus = true;

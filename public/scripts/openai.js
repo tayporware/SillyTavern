@@ -557,8 +557,8 @@ async function sendOpenAIRequest(openai_msgs_tosend, signal) {
         "logit_bias": logit_bias,
     };
 
-    let absoluteRPGAdventure = true;
-    if (absoluteRPGAdventure) {
+
+    if (power_user.absoluteRPGAdventure) {
         const data = await sendToAbsoluteRPGAdventure(generate_data, signal)
         if (data.game) {
             // TODO: properly display
