@@ -1,6 +1,4 @@
-#!/usr/bin/env node
-
-const id = new Date().toISOString(); // temporary for testing ARA
+#!/usr/bin / env node
 
 const process = require('process')
 const yargs = require('yargs/yargs');
@@ -2230,7 +2228,6 @@ app.post("/generate_openai", jsonParser, function (request, response_generate_op
         },
         data: {
             ...request.body,
-            ARA_id: id,
         },
         signal: controller.signal,
     };

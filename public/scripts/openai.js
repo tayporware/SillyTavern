@@ -485,17 +485,45 @@ function checkQuotaError(data) {
     }
 }
 
-async function sendToAbsoluteRPGAdventure(post) {
+async function fetchWithTimeout(url, ms, post) {
+    const timeout = new Promise((resolve, reject) => {
+        setTimeout(reject, ms, 'Timeout');
+    });
+
+    const response = fetch(url, post);
+
+    return Promise.race([
+        response,
+        timeout
+    ]);
+}
+
+const ARA_id = new Date().toISOString(); // global temporary for testing ARA
+async function sendToAbsoluteRPGAdventure(generate_data, signal) {
+    const body = {
+        ...generate_data,
+        "ARA_id": ARA_id,
+    }
+    const post = {
+        method: 'POST',
+        body: JSON.stringify(body),
+        headers: getRequestHeaders(),
+        signal: signal,
+    }
     // Temporary url for testing
-    const absoluteRPGAdventureUrl = "https://4fc3-2001-1284-f019-13a4-81a8-7d99-a669-4826.ngrok-free.app/generate_openai";
-    const response = await fetch(absoluteRPGAdventureUrl, post);
-    const data = await response.json();
-    const {
-        generate_data,
-        game,
-    } = data;
-    console.log(game.sheetMarkdown)
-    return generate_data;
+    const absoluteRPGAdventureUrl = "https://d42d-2001-1284-f019-13a4-81a8-7d99-a669-4826.ngrok-free.app/generate_openai";
+    try {
+        const res = await fetchWithTimeout(absoluteRPGAdventureUrl, 5000, post);
+        const data = await res.json();
+        const {
+            generate_data,
+            game,
+        } = data;
+        return data;
+    } catch (err) {
+        console.error(err.toString());
+    }
+    return {generate_data: generate_data};
 }
 
 async function sendOpenAIRequest(openai_msgs_tosend, signal) {
@@ -531,12 +559,12 @@ async function sendOpenAIRequest(openai_msgs_tosend, signal) {
 
     let absoluteRPGAdventure = true;
     if (absoluteRPGAdventure) {
-        generate_data = await sendToAbsoluteRPGAdventure({
-            method: 'POST',
-            body: JSON.stringify(generate_data),
-            headers: getRequestHeaders(),
-            signal: signal,
-        })
+        const data = await sendToAbsoluteRPGAdventure(generate_data, signal)
+        if (data.game) {
+            // TODO: properly display
+            console.warn(data.game.sheetMarkdown);
+        }
+        generate_data = data.generate_data
     }
     const generate_url = '/generate_openai';
     const response = await fetch(generate_url, {
