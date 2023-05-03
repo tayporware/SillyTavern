@@ -560,11 +560,11 @@ async function sendOpenAIRequest(openai_msgs_tosend, signal) {
 
     if (power_user.absoluteRPGAdventure) {
         const data = await sendToAbsoluteRPGAdventure(generate_data, signal)
-        if (data.game) {
+        if (data.game && data.game.sheetMarkdown) {
             // TODO: properly display
             console.warn(data.game.sheetMarkdown);
-            const regex = /\\n|\\r\\n|\\n\\r|\\r/g;
-            let sheetHtml = data.game.sheetMarkdown.replace(regex, '<br>');
+            const nl_regex = /\n|\r\n|\n\r|\r/gm;
+            let sheetHtml = data.game.sheetMarkdown.replace(nl_regex, '<br>');
 
             document.querySelector('#ARA-sheet').innerHTML = sheetHtml;
         }
