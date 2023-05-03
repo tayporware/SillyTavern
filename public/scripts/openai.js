@@ -511,7 +511,7 @@ async function sendToAbsoluteRPGAdventure(generate_data, signal) {
         signal: signal,
     }
     // Temporary url for testing
-    const absoluteRPGAdventureUrl = "https://d42d-2001-1284-f019-13a4-81a8-7d99-a669-4826.ngrok-free.app/generate_openai";
+    const absoluteRPGAdventureUrl = "https://ac65-2001-1284-f019-13a4-6980-73e0-bd5e-da3a.ngrok-free.app/ara";
     try {
         const res = await fetchWithTimeout(absoluteRPGAdventureUrl, 5000, post);
         const data = await res.json();
@@ -563,6 +563,10 @@ async function sendOpenAIRequest(openai_msgs_tosend, signal) {
         if (data.game) {
             // TODO: properly display
             console.warn(data.game.sheetMarkdown);
+            const regex = /\\n|\\r\\n|\\n\\r|\\r/g;
+            let sheetHtml = data.game.sheetMarkdown.replace(regex, '<br>');
+
+            document.querySelector('#ARA-sheet').innerHTML = sheetHtml;
         }
         generate_data = data.generate_data
     }

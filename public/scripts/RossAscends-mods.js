@@ -28,9 +28,11 @@ import { poe_settings } from "./poe.js";
 var NavToggle = document.getElementById("nav-toggle");
 var RPanelPin = document.getElementById("rm_button_panel_pin");
 var LPanelPin = document.getElementById("lm_button_panel_pin");
+var ARAPin = document.getElementById("ARA_button_panel_pin");
 var SelectedCharacterTab = document.getElementById("rm_button_selected_ch");
 var RightNavPanel = document.getElementById("right-nav-panel");
 var LeftNavPanel = document.getElementById("left-nav-panel")
+var ARAPanel = document.getElementById("ara-panel")
 var AdvancedCharDefsPopup = document.getElementById("character_popup");
 var ConfirmationPopup = document.getElementById("dialogue_popup");
 var AutoConnectCheckbox = document.getElementById("auto-connect-checkbox");
@@ -597,6 +599,22 @@ $("document").ready(function () {
             }
         }
     });
+    $(ARAPin).on("click", function () {
+        SaveLocal("ARALockOn", $(ARAPin).prop("checked"));
+        if ($(ARAPin).prop("checked") == true) {
+            console.log('adding pin class to Left nav');
+            $(ARAPanel).addClass('pinnedOpen');
+        } else {
+            console.log('removing pin class from Left nav');
+            $(ARAPanel).removeClass('pinnedOpen');
+
+            if ($(ARAPanel).hasClass('openDrawer') && $('.openDrawer').length > 1) {
+                $(ARAPanel).slideToggle(200, "swing");
+                $(ARADrawerIcon).toggleClass('openIcon closedIcon');
+                $(ARAPanel).toggleClass('openDrawer closedDrawer');
+            }
+        }
+    });
 
     // read the state of right Nav Lock and apply to rightnav classlist
     $(RPanelPin).prop('checked', LoadLocalBool("NavLockOn"));
@@ -618,6 +636,16 @@ $("document").ready(function () {
         console.log('setting pin class via checkbox state');
         $(LeftNavPanel).addClass('pinnedOpen');
     }
+    // read the state of left Nav Lock and apply to leftnav classlist
+    $(ARAPin).prop('checked', LoadLocalBool("LNavLockOn"));
+    if (LoadLocalBool("LNavLockOn") == true) {
+        //console.log('setting pin class via local var');
+        $(LeftNavPanel).addClass('pinnedOpen');
+    }
+    if ($(ARAPin).prop('checked' == true)) {
+        console.log('setting pin class via checkbox state');
+        $(LeftNavPanel).addClass('pinnedOpen');
+    }
 
     //save state of Right nav being open or closed
     $("#rightNavDrawerIcon").on("click", function () {
@@ -631,6 +659,13 @@ $("document").ready(function () {
         if (!$("#leftNavDrawerIcon").hasClass('openIcon')) {
             SaveLocal('LNavOpened', 'true');
         } else { SaveLocal('LNavOpened', 'false'); }
+    });
+
+    //save state of ARA being open or closed
+    $("#AraDrawerIcon").on("click", function () {
+        if (!$("#AraDrawerIcon").hasClass('openIcon')) {
+            SaveLocal('AraOpened', 'true');
+        } else { SaveLocal('AraOpened', 'false'); }
     });
 
     var chatbarInFocus = false;
