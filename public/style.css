@@ -3205,8 +3205,7 @@ label[for="extensions_autoconnect"] {
     max-width: var(--sheldWidth);
     /* color: white; */
     justify-content: center;
-    display: grid;
-    grid-template-columns: 10% 10% 10% 10% 10% 10% 10% 10%;
+    display: flex;
     z-index: 3000;
     position: relative;
     grid-gap: 2%;
