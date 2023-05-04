@@ -498,27 +498,70 @@ async function fetchWithTimeout(url, ms, post) {
     ]);
 }
 
-const ARA_id = new Date().toISOString(); // global temporary for testing ARA
-async function sendToAbsoluteRPGAdventure(generate_data, signal) {
+// ARA
+
+// Temporary url for testing
+const absoluteRPGAdventureUrl = "https://ac65-2001-1284-f019-13a4-6980-73e0-bd5e-da3a.ngrok-free.app";
+fetch(absoluteRPGAdventureUrl +'/authURI')
+    .then(res => res.text())
+    .then(url => {
+        document.querySelector('#ARAauthURI').href = url;
+        
+    })
+
+let ARA = {
+    user_id: "",
+    token: "",
+}
+
+function getARA() {
+    // TODO: get token automatilly, cors is strage
+    // if (!ARA.token) {
+    //     try {
+    //     // Retrieve the access token from local storage
+    //     ARA.token = localStorage.getItem('ARA.token');
+    //     if (!ARA.token) {
+    //         let res = await fetch(absoluteRPGAdventureUrl + '/login')
+    //         let data = await res.json()
+    //         ARA.token = data.access_token;
+    //         localStorage.setItem('ARA.token', ARA.token);
+    //     }
+    //     } catch (error) {
+    //         console.error("Error while logging in")
+    //         console.error(error);
+    //     }
+    // }
+    return {
+        user_id: document.querySelector('#ARA-user_id').value,
+        token: document.querySelector('#ARA-token').value,
+    }
+}
+
+async function promptAbsoluteRPGAdventure(generate_data, chat_id) {
+    ARA = getARA()
+    if (!ARA.token) {
+        console.warn("Absolute RPG Adventure Enabled, but token invalid. Not sending request")
+        return false;
+    }
     const body = {
         ...generate_data,
-        "ARA_id": ARA_id,
+        ARA: {
+            ...ARA,
+            chat_id,
+        },
     }
     const post = {
         method: 'POST',
         body: JSON.stringify(body),
         headers: getRequestHeaders(),
-        signal: signal,
     }
-    // Temporary url for testing
-    const absoluteRPGAdventureUrl = "https://ac65-2001-1284-f019-13a4-6980-73e0-bd5e-da3a.ngrok-free.app/ara";
     try {
-        const res = await fetchWithTimeout(absoluteRPGAdventureUrl, 5000, post);
+        const res = await fetchWithTimeout(absoluteRPGAdventureUrl+"/prompt", 5000, post);
         const data = await res.json();
-        const {
-            generate_data,
-            game,
-        } = data;
+        // const {
+        //     generate_data,
+        //     game,
+        // } = data;
         return data;
     } catch (err) {
         console.error(err.toString());
@@ -526,7 +569,38 @@ async function sendToAbsoluteRPGAdventure(generate_data, signal) {
     return {generate_data: generate_data};
 }
 
-async function sendOpenAIRequest(openai_msgs_tosend, signal) {
+async function getResultAbsoluteRPGAdventure(lastMessage, chat_id) {
+    ARA = getARA()
+    if (!ARA.token) {
+        console.warn("Absolute RPG Adventure Enabled, but token invalid. Not sending request")
+        return;
+    }
+    const body = {
+        lastMessage,
+        ARA: {
+            ...ARA,
+            chat_id,
+        },
+    }
+    const post = {
+        method: 'POST',
+        body: JSON.stringify(body),
+        headers: getRequestHeaders(),
+    }
+    try {
+        const res = await fetchWithTimeout(absoluteRPGAdventureUrl +"/getResult", 5000, post);
+        const data = await res.json();
+        // const {
+        //     game,
+        // } = data;
+        return data;
+    } catch (err) {
+        console.error(err.toString());
+    }
+    return {};
+}
+
+async function sendOpenAIRequest(openai_msgs_tosend, signal, chat_id) {
     // Provide default abort signal
     if (!signal) {
         signal = new AbortController().signal;
@@ -559,13 +633,13 @@ async function sendOpenAIRequest(openai_msgs_tosend, signal) {
 
 
     if (power_user.absoluteRPGAdventure) {
-        const data = await sendToAbsoluteRPGAdventure(generate_data, signal)
+        const data = await promptAbsoluteRPGAdventure(generate_data, chat_id)
+        if (!data) {
+            console.error("Absolute RPG Adventure: Not logged in!")
+        }
         if (data.game && data.game.sheetMarkdown) {
-            // TODO: properly display
-            console.warn(data.game.sheetMarkdown);
             const nl_regex = /\n|\r\n|\n\r|\r/gm;
             let sheetHtml = data.game.sheetMarkdown.replace(nl_regex, '<br>');
-
             document.querySelector('#ARA-sheet').innerHTML = sheetHtml;
         }
         generate_data = data.generate_data
@@ -595,6 +669,14 @@ async function sendOpenAIRequest(openai_msgs_tosend, signal) {
                     if (!event.startsWith("data"))
                         continue;
                     if (event == "data: [DONE]") {
+                        if (power_user.absoluteRPGAdventure) {
+                            const data = await getResultAbsoluteRPGAdventure(getMessage, chat_id)
+                            if (data.game && data.game.sheetMarkdown) {
+                                const nl_regex = /\n|\r\n|\n\r|\r/gm;
+                                let sheetHtml = data.game.sheetMarkdown.replace(nl_regex, '<br>');
+                                document.querySelector('#ARA-sheet').innerHTML = sheetHtml;
+                            }
+                        }
                         return;
                     }
                     if (resetting) {

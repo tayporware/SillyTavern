@@ -1999,10 +1999,10 @@ async function Generate(type, automatic_trigger, force_name2) {
                 let prompt = await prepareOpenAIMessages(name2, storyString, worldInfoBefore, worldInfoAfter, afterScenarioAnchor, promptBias, type);
 
                 if (isStreamingEnabled()) {
-                    streamingProcessor.generator = await sendOpenAIRequest(prompt, streamingProcessor.abortController.signal);
+                    streamingProcessor.generator = await sendOpenAIRequest(prompt, streamingProcessor.abortController.signal, characters[this_chid].chat);
                 }
                 else {
-                    sendOpenAIRequest(prompt).then(onSuccess).catch(onError);
+                    sendOpenAIRequest(prompt, null, characters[this_chid].chat).then(onSuccess).catch(onError);
                 }
             }
             else if (main_api == 'kobold' && horde_settings.use_horde) {
