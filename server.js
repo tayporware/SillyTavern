@@ -55,6 +55,9 @@ const ExifReader = require('exifreader');
 const exif = require('piexifjs');
 const webp = require('webp-converter');
 const DeviceDetector = require("device-detector-js");
+const { TextEncoder, TextDecoder } = require('util');
+const utf8Encode = new TextEncoder();
+const utf8Decode = new TextDecoder('utf-8', { ignoreBOM: true });
 
 const config = require(path.join(__dirname, './config.conf'));
 const server_port = process.env.SILLY_TAVERN_PORT || config.port;
@@ -128,6 +131,20 @@ async function countTokensLlama(text) {
 
     let ids = spp.encodeIds(cleaned);
     return ids.length;
+}
+
+const tokenizersCache = {};
+
+function getTiktokenTokenizer(model) {
+    if (tokenizersCache[model]) {
+        console.log('Using the cached tokenizer instance for', model);
+        return tokenizersCache[model];
+    }
+
+    const tokenizer = tiktoken.encoding_for_model(model);
+    console.log('Instantiated the tokenizer for', model);
+    tokenizersCache[model] = tokenizer;
+    return tokenizer;
 }
 
 function humanizedISO8601DateTime() {
@@ -282,7 +299,7 @@ app.get('/get_faq', function (_, response) {
 app.get('/get_readme', function (_, response) {
     response.sendFile(__dirname + "/readme.md");
 });
-app.get('/deviceinfo', function(request, response) {
+app.get('/deviceinfo', function (request, response) {
     const userAgent = request.header('user-agent');
     const deviceDetector = new DeviceDetector();
     const deviceInfo = deviceDetector.parse(userAgent);
@@ -378,6 +395,7 @@ app.post("/generate_textgenerationwebui", jsonParser, async function (request, r
 
     if (!!request.header('X-Response-Streaming')) {
         let isStreamingStopped = false;
+        request.socket.removeAllListeners('close');
         request.socket.on('close', function () {
             isStreamingStopped = true;
         });
@@ -663,6 +681,29 @@ app.post("/createcharacter", urlencodedParser, function (request, response) {
     }
 });
 
+app.post('/renamechat', jsonParser, async function (request, response) {
+    if (!request.body || !request.body.original_file || !request.body.renamed_file) {
+        return response.sendStatus(400);
+    }
+
+    const pathToFolder = request.body.is_group
+        ? directories.groupChats
+        : path.join(directories.chats, String(request.body.avatar_url).replace('.png', ''));
+    const pathToOriginalFile = path.join(pathToFolder, request.body.original_file);
+    const pathToRenamedFile = path.join(pathToFolder, request.body.renamed_file);
+    console.log('Old chat name', pathToOriginalFile);
+    console.log('New chat name', pathToRenamedFile);
+
+    if (!fs.existsSync(pathToOriginalFile) || fs.existsSync(pathToRenamedFile)) {
+        console.log('Either Source or Destination files are not available');
+        return response.status(400).send({ error: true });
+    }
+
+    console.log('Successfully renamed.');
+    fs.renameSync(pathToOriginalFile, pathToRenamedFile);
+    return response.send({ ok: true });
+});
+
 app.post("/renamecharacter", jsonParser, async function (request, response) {
     if (!request.body.avatar_url || !request.body.new_name) {
         return response.sendStatus(400);
@@ -822,12 +863,34 @@ async function charaRead(img_url, input_format) {
 
     switch (format) {
         case 'webp':
-            const exif_data = await ExifReader.load(fs.readFileSync(img_url));
-            const char_data = exif_data['UserComment']['description'];
-            if (char_data === 'Undefined' && exif_data['UserComment'].value && exif_data['UserComment'].value.length === 1) {
-                return exif_data['UserComment'].value[0];
+            try {
+                const exif_data = await ExifReader.load(fs.readFileSync(img_url));
+                let char_data;
+
+                if (exif_data['UserComment']['description']) {
+                    let description = exif_data['UserComment']['description'];
+                    if (description === 'Undefined' && exif_data['UserComment'].value && exif_data['UserComment'].value.length === 1) {
+                        description = exif_data['UserComment'].value[0];
+                    }
+                    try {
+                        json5.parse(description);
+                        char_data = description;
+                    } catch {
+                        const byteArr = description.split(",").map(Number);
+                        const uint8Array = new Uint8Array(byteArr);
+                        const char_data_string = utf8Decode.decode(uint8Array);
+                        char_data = char_data_string;
+                    }
+                } else {
+                    console.log('No description found in EXIF data.');
+                    return false;
+                }
+                return char_data;
             }
-            return char_data;
+            catch (err) {
+                console.log(err);
+                return false;
+            }
         case 'png':
             const buffer = fs.readFileSync(img_url);
             const chunks = extract(buffer);
@@ -1371,33 +1434,42 @@ app.post("/getallchatsofcharacter", jsonParser, function (request, response) {
             for (let i = jsonFiles.length - 1; i >= 0; i--) {
                 const file = jsonFiles[i];
                 const fileStream = fs.createReadStream(chatsPath + char_dir + '/' + file);
+
+                const fullPathAndFile = chatsPath + char_dir + '/' + file
+                const stats = fs.statSync(fullPathAndFile);
+                const fileSizeInKB = (stats.size / 1024).toFixed(2) + "kb";
+
+                //console.log(fileSizeInKB);
+
                 const rl = readline.createInterface({
                     input: fileStream,
                     crlfDelay: Infinity
                 });
 
                 let lastLine;
+                let itemCounter = 0;
                 rl.on('line', (line) => {
+                    itemCounter++;
                     lastLine = line;
                 });
                 rl.on('close', () => {
+                    ii--;
                     if (lastLine) {
+
                         let jsonData = json5.parse(lastLine);
-                        if (jsonData.name !== undefined) {
+                        if (jsonData.name !== undefined || jsonData.character_name !== undefined) {
                             chatData[i] = {};
                             chatData[i]['file_name'] = file;
-                            chatData[i]['mes'] = jsonData['mes'];
-                            ii--;
-                            if (ii === 0) {
-                                console.log('ii count went to zero, responding with chatData');
-                                response.send(chatData);
-                            }
-                        } else {
-                            console.log('just returning from getallchatsofcharacter');
-                            return;
+                            chatData[i]['file_size'] = fileSizeInKB;
+                            chatData[i]['chat_items'] = itemCounter - 1;
+                            chatData[i]['mes'] = jsonData['mes'] || '[The chat is empty]';
                         }
                     }
-                    console.log('successfully closing getallchatsofcharacter');
+                    if (ii === 0) {
+                        //console.log('ii count went to zero, responding with chatData');
+                        response.send(chatData);
+                    }
+                    //console.log('successfully closing getallchatsofcharacter');
                     rl.close();
                 });
             };
@@ -1509,13 +1581,14 @@ app.post("/exportcharacter", jsonParser, async function (request, response) {
         case 'webp': {
             try {
                 let json = await charaRead(filename);
+                let stringByteArray = utf8Encode.encode(json).toString();
                 let inputWebpPath = `./uploads/${Date.now()}_input.webp`;
                 let outputWebpPath = `./uploads/${Date.now()}_output.webp`;
                 let metadataPath = `./uploads/${Date.now()}_metadata.exif`;
                 let metadata =
                 {
                     "Exif": {
-                        [exif.ExifIFD.UserComment]: json,
+                        [exif.ExifIFD.UserComment]: stringByteArray,
                     },
                 };
                 const exifString = exif.dump(metadata);
@@ -1524,10 +1597,11 @@ app.post("/exportcharacter", jsonParser, async function (request, response) {
                 await webp.cwebp(filename, inputWebpPath, '-q 95');
                 await webp.webpmux_add(inputWebpPath, outputWebpPath, metadataPath, 'exif');
 
-                response.sendFile(outputWebpPath, { root: __dirname });
-
-                fs.rmSync(inputWebpPath);
-                fs.rmSync(metadataPath);
+                response.sendFile(outputWebpPath, { root: __dirname }, () => {
+                    fs.rmSync(inputWebpPath);
+                    fs.rmSync(metadataPath);
+                    fs.rmSync(outputWebpPath);
+                });
 
                 return;
             }
@@ -1630,7 +1704,7 @@ app.post("/importchat", urlencodedParser, function (request, response) {
                         }
                     });
                 } else {
-                    response.send({error:true});
+                    response.send({ error: true });
                     return;
                 }
                 rl.close();
@@ -1794,6 +1868,22 @@ app.post('/getgroupchat', jsonParser, (request, response) => {
     }
 });
 
+app.post('/deletegroupchat', jsonParser, (request, response) => {
+    if (!request.body || !request.body.id) {
+        return response.sendStatus(400);
+    }
+
+    const id = request.body.id;
+    const pathToFile = path.join(directories.groupChats, `${id}.jsonl`);
+
+    if (fs.existsSync(pathToFile)) {
+        fs.rmSync(pathToFile);
+        return response.send({ ok: true });
+    }
+
+    return response.send({ error: true });
+});
+
 app.post('/savegroupchat', jsonParser, (request, response) => {
     if (!request.body || !request.body.id) {
         return response.sendStatus(400);
@@ -1902,6 +1992,7 @@ app.post('/generate_poe', jsonParser, async (request, response) => {
 
     if (streaming) {
         let isStreamingStopped = false;
+        request.socket.removeAllListeners('close');
         request.socket.on('close', function () {
             isStreamingStopped = true;
             client.abortController.abort();
@@ -2133,8 +2224,9 @@ app.post("/getstatus_openai", jsonParser, function (request, response_getstatus_
     };
     client.get(api_url + "/models", args, function (data, response) {
         if (response.statusCode == 200) {
-            console.log(data);
-            response_getstatus_openai.send(data);//data);
+            response_getstatus_openai.send(data);
+            const modelIds = data?.data?.map(x => x.id)?.sort();
+            console.log('Available OpenAI models:', modelIds);
         }
         if (response.statusCode == 401) {
             console.log('Access Token is incorrect.');
@@ -2159,7 +2251,7 @@ app.post("/openai_bias", jsonParser, async function (request, response) {
 
     let result = {};
 
-    const tokenizer = tiktoken.encoding_for_model(request.query.model === 'gpt-4-0314' ? 'gpt-4' : request.query.model);
+    const tokenizer = getTiktokenTokenizer(request.query.model === 'gpt-4-0314' ? 'gpt-4' : request.query.model);
 
     for (const entry of request.body) {
         if (!entry || !entry.text) {
@@ -2173,7 +2265,8 @@ app.post("/openai_bias", jsonParser, async function (request, response) {
         }
     }
 
-    tokenizer.free();
+    // not needed for cached tokenizers
+    //tokenizer.free();
     return response.send(result);
 });
 
@@ -2207,11 +2300,28 @@ app.post("/openai_usage", jsonParser, async function (request, response) {
     }
 });
 
+app.post("/deletepreset_openai", jsonParser, function (request, response) {
+    if (!request.body || !request.body.name) {
+        return response.sendStatus(400);
+    }
+
+    const name = request.body.name;
+    const pathToFile = path.join(directories.openAI_Settings, `${name}.settings`);
+
+    if (fs.existsSync(pathToFile)) {
+        fs.rmSync(pathToFile);
+        return response.send({ ok: true });
+    }
+
+    return response.send({ error: true });
+});
+
 app.post("/generate_openai", jsonParser, function (request, response_generate_openai) {
     if (!request.body) return response_generate_openai.sendStatus(400);
     const api_url = new URL(request.body.reverse_proxy || api_openai).toString();
 
     const controller = new AbortController();
+    request.socket.removeAllListeners('close');
     request.socket.on('close', function () {
         controller.abort();
     });
@@ -2300,7 +2410,7 @@ app.post("/tokenize_openai", jsonParser, function (request, response_tokenize_op
     const tokensPerMessage = request.query.model.includes('gpt-4') ? 3 : 4;
     const tokensPadding = 3;
 
-    const tokenizer = tiktoken.encoding_for_model(request.query.model === 'gpt-4-0314' ? 'gpt-4' : request.query.model);
+    const tokenizer = getTiktokenTokenizer(request.query.model === 'gpt-4-0314' ? 'gpt-4' : request.query.model);
 
     let num_tokens = 0;
     for (const msg of request.body) {
@@ -2314,7 +2424,8 @@ app.post("/tokenize_openai", jsonParser, function (request, response_tokenize_op
     }
     num_tokens += tokensPadding;
 
-    tokenizer.free();
+    // not needed for cached tokenizers
+    //tokenizer.free();
 
     response_tokenize_openai.send({ "token_count": num_tokens });
 });

@@ -49,7 +49,7 @@ var count_tokens;
 var perm_tokens;
 
 var connection_made = false;
-var retry_delay = 100;
+var retry_delay = 500;
 var RA_AC_retries = 1;
 
 const observerConfig = { childList: true, subtree: true };
@@ -733,7 +733,7 @@ $("document").ready(function () {
     function isInputElementInFocus() {
         //return $(document.activeElement).is(":input");
         var focused = $(':focus');
-        if (focused.is('input') || focused.is('textarea')) {
+        if (focused.is('input') || focused.is('textarea') || focused.attr('contenteditable') == 'true') {
             if (focused.attr('id') === 'send_textarea') {
                 return false;
             }

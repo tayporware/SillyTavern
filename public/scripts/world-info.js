@@ -155,6 +155,7 @@ function appendWorldEntry(entry) {
         // Prevent closing the drawer on clicking the input
         event.stopPropagation();
     });
+
     keyInput.on("input", function () {
         const uid = $(this).data("uid");
         const value = $(this).val();
@@ -166,6 +167,7 @@ function appendWorldEntry(entry) {
         saveWorldInfo();
     });
     keyInput.val(entry.key.join(",")).trigger("input");
+    initScrollHeight(keyInput);
 
     // keysecondary
     const keySecondaryInput = template.find('textarea[name="keysecondary"]');
@@ -181,6 +183,7 @@ function appendWorldEntry(entry) {
         saveWorldInfo();
     });
     keySecondaryInput.val(entry.keysecondary.join(",")).trigger("input");
+    initScrollHeight(keySecondaryInput);
 
     // comment
     const commentInput = template.find('textarea[name="comment"]');
@@ -192,6 +195,7 @@ function appendWorldEntry(entry) {
         saveWorldInfo();
     });
     commentInput.val(entry.comment).trigger("input");
+    //initScrollHeight(commentInput);
 
     // content
     const contentInput = template.find('textarea[name="content"]');
@@ -210,6 +214,7 @@ function appendWorldEntry(entry) {
             .html(numberOfTokens);
     });
     contentInput.val(entry.content).trigger("input");
+    //initScrollHeight(contentInput);
 
     // selective
     const selectiveInput = template.find('input[name="selective"]');
@@ -304,12 +309,20 @@ function appendWorldEntry(entry) {
     });
 
     template.appendTo("#world_popup_entries_list");
+
     return template;
 }
 
 async function resetScrollHeight(element) {
+    element.style.height = '';
+    element.style.height = (element.scrollHeight) + 3 + 'px';
+}
+
+async function initScrollHeight(element) {
     await delay(1);
-    const height = Number($(element).prop("scrollHeight")) + 1;
+    const height = Number($(element).prop("scrollHeight") + 3);
+    console.log(height);
+    //console.log(element.style.height);
     $(element).css("height", "");
     $(element).css("height", `${height}px`);
 }
