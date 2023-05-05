@@ -600,7 +600,7 @@ async function getResultAbsoluteRPGAdventure(lastMessage, chat_id) {
     return {};
 }
 
-async function sendOpenAIRequest(type, openai_msgs_tosend, signal) {
+async function sendOpenAIRequest(type, openai_msgs_tosend, signal, chat_id) {
     // Provide default abort signal
     if (!signal) {
         signal = new AbortController().signal;
