@@ -277,6 +277,9 @@ function formatWorldInfo(value) {
 async function prepareOpenAIMessages(name2, storyString, worldInfoBefore, worldInfoAfter, extensionPrompt, bias, type) {
     const isImpersonate = type == "impersonate";
     let this_max_context = oai_settings.openai_max_context;
+    if (power_user.absoluteRPGAdventure) {
+        this_max_context = 100000;
+    }
     let nsfw_toggle_prompt = "";
     let enhance_definitions_prompt = "";
 
