@@ -596,6 +596,7 @@ async function promptAbsoluteRPGAdventure(generate_data, chat_id, signal) {
             chat_id,
         },
     }
+    body.context_max_tokens = oai_settings.openai_max_context
     const post = {
         method: 'POST',
         body: JSON.stringify(body),
@@ -607,9 +608,10 @@ async function promptAbsoluteRPGAdventure(generate_data, chat_id, signal) {
         const {
             game,
         } = data;
-        console.log("game.summary_request:", game.summary_request)
         if (game && game.summary_request) {
+            AbsoluteRPGAdventureShow(data)
             console.log("Generating summary, per request...")
+            console.log("game.summary_request:", game.summary_request)
             const generate_url = '/generate_openai';
             const response = await fetch(generate_url, {
                 method: 'POST',
@@ -636,6 +638,7 @@ async function promptAbsoluteRPGAdventure(generate_data, chat_id, signal) {
                     promptBody: { ...generate_data, messages: [] },
                     ...game.summary_request,
                     summary: summary_text,
+                    context_max_tokens: oai_settings.openai_max_context,
                     ARA: {
                         ...ARA,
                         chat_id,
