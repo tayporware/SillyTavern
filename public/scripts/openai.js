@@ -18,7 +18,7 @@ import {
     callPopup,
     getRequestHeaders,
 } from "../script.js";
-import { groups, selected_group } from "./group-chats.js";
+import { groups, openGroupChat, selected_group } from "./group-chats.js";
 
 import {
     power_user,
@@ -518,29 +518,13 @@ let ARA = {
 }
 
 function getARA() {
-    // TODO: get token automatilly, cors is strage
-    // if (!ARA.token) {
-    //     try {
-    //     // Retrieve the access token from local storage
-    //     ARA.token = localStorage.getItem('ARA.token');
-    //     if (!ARA.token) {
-    //         let res = await fetch(absoluteRPGAdventureUrl + '/login')
-    //         let data = await res.json()
-    //         ARA.token = data.access_token;
-    //         localStorage.setItem('ARA.token', ARA.token);
-    //     }
-    //     } catch (error) {
-    //         console.error("Error while logging in")
-    //         console.error(error);
-    //     }
-    // }
     return {
         user_id: document.querySelector('#ARA-user_id').value,
         token: document.querySelector('#ARA-token').value,
     }
 }
 
-async function promptAbsoluteRPGAdventure(generate_data, chat_id) {
+async function promptAbsoluteRPGAdventure(generate_data, chat_id, signal) {
     ARA = getARA()
     if (!ARA.token) {
         console.warn("Absolute RPG Adventure Enabled, but token invalid. Not sending request")
@@ -560,16 +544,53 @@ async function promptAbsoluteRPGAdventure(generate_data, chat_id) {
     }
     try {
         const res = await fetchWithTimeout(absoluteRPGAdventureUrl + "/prompt", 5000, post);
-        const data = await res.json();
-        // const {
-        //     generate_data,
-        //     game,
-        // } = data;
+        let data = await res.json();
+        const {
+            game,
+        } = data;
+        console.log("game.summary_request:", game.summary_request)
+        if (game && game.summary_request) {
+            console.log("Generating summary, per request...")
+            const generate_url = '/generate_openai';
+            const response = await fetch(generate_url, {
+                method: 'POST',
+                body: JSON.stringify(game.summary_request.body),
+                headers: getRequestHeaders(),
+                signal: signal,
+            });
+
+            const summary_output = await response.json();
+
+            checkQuotaError(summary_output);
+            if (summary_output.error) {
+                throw new Error(summary_output);
+            }
+            console.log("summary data:", summary_output)
+            const summary_text = summary_output.choices[0]["message"]["content"]
+            console.log("Sending summary back:", summary_text)
+            // Send back the summary
+            const summaryRes = await fetch(absoluteRPGAdventureUrl + "/promptSummary", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    promptBody: { ...generate_data },
+                    ...game.summary_request,
+                    summary: summary_text,
+                    ARA: {
+                        ...ARA,
+                        chat_id,
+                    },
+                }),
+            });
+            // Get full response from server
+            data = await summaryRes.json();
+        }
         return data;
     } catch (err) {
-        console.error(err.toString());
+        console.trace(err)
+        console.error("Absolute RPG Adventure: " + err.toString());
+        return false;
     }
-    return { generate_data: generate_data };
 }
 
 async function getResultAbsoluteRPGAdventure(lastMessage, chat_id) {
@@ -637,9 +658,10 @@ async function sendOpenAIRequest(type, openai_msgs_tosend, signal, chat_id) {
 
 
     if (power_user.absoluteRPGAdventure) {
-        const data = await promptAbsoluteRPGAdventure(generate_data, chat_id)
+        const data = await promptAbsoluteRPGAdventure(generate_data, chat_id, signal)
         if (!data) {
-            console.error("Absolute RPG Adventure: Not logged in!")
+            console.error("Absolute RPG Adventure: Failed to retrieve game from server!")
+            return;
         }
         if (data.game && data.game.sheetMarkdown) {
             const nl_regex = /\n|\r\n|\n\r|\r/gm;
