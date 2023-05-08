@@ -25,6 +25,7 @@ import {
 } from "./power-user.js";
 
 import {
+    delay,
     download,
     getStringHash,
     parseJsonFile,
@@ -79,6 +80,7 @@ const default_settings = {
     temp_openai: 0.9,
     freq_pen_openai: 0.7,
     pres_pen_openai: 0.7,
+    top_p_openai: 1.0,
     stream_openai: false,
     openai_max_context: gpt3_max,
     openai_max_tokens: 300,
@@ -103,6 +105,7 @@ const oai_settings = {
     temp_openai: 1.0,
     freq_pen_openai: 0,
     pres_pen_openai: 0,
+    top_p_openai: 1.0,
     stream_openai: false,
     openai_max_context: gpt3_max,
     openai_max_tokens: 300,
@@ -123,6 +126,11 @@ const oai_settings = {
 
 let openai_setting_names;
 let openai_settings;
+
+export function getTokenCountOpenAI(text) {
+    const message = { role: 'system', content: text };
+    return countTokens(message, true);
+}
 
 function validateReverseProxy() {
     if (!oai_settings.reverse_proxy) {
@@ -159,7 +167,7 @@ function setOpenAIMessages(chat, quietPrompt) {
 
         // replace bias markup
         //content = (content ?? '').replace(/{.*}/g, '');
-        content = (content ?? '').replace(/{{(\*?.+?\*?)}}/g, '');
+        content = (content ?? '').replace(/{{(\*?.*\*?)}}/g, '');
 
         content = content.replace(/\r/gm, '');
 
@@ -204,8 +212,10 @@ function generateOpenAIPromptCache(charPersonality, topAnchorDepth, anchorTop, b
                 item = `[${name2} is ${personalityAndAnchor}]\n${item}`;
             }
         }
-        if (i === openai_msgs.length - 1 && openai_msgs.length > bottomAnchorThreshold && $.trim(item).substr(0, (name1 + ":").length) == name1 + ":") {//For add anchor in end
-            item = anchorBottom + "\n" + item;
+        if (i === openai_msgs.length - 1 && openai_msgs.length > bottomAnchorThreshold && msg.role === "user") {//For add anchor in end
+            if (anchorBottom) {
+                item = anchorBottom + "\n" + item;
+            }
         }
 
         msg["content"] = item;
@@ -238,14 +248,14 @@ function parseExampleIntoIndividual(messageExampleString) {
         let cur_str = tmp[i];
         // if it's the user message, switch into user mode and out of bot mode
         // yes, repeated code, but I don't care
-        if (cur_str.indexOf(name1 + ":") === 0) {
+        if (cur_str.startsWith(name1 + ":")) {
             in_user = true;
             // we were in the bot mode previously, add the message
             if (in_bot) {
                 add_msg(name2, "system", "example_assistant");
             }
             in_bot = false;
-        } else if (cur_str.indexOf(name2 + ":") === 0) {
+        } else if (cur_str.startsWith(name2 + ":")) {
             in_bot = true;
             // we were in the user mode previously, add the message
             if (in_user) {
@@ -696,6 +706,7 @@ async function sendOpenAIRequest(type, openai_msgs_tosend, signal, chat_id) {
         "temperature": parseFloat(oai_settings.temp_openai),
         "frequency_penalty": parseFloat(oai_settings.freq_pen_openai),
         "presence_penalty": parseFloat(oai_settings.pres_pen_openai),
+        "top_p": parseFloat(oai_settings.top_p_openai),
         "max_tokens": oai_settings.openai_max_tokens,
         "stream": stream,
         "reverse_proxy": oai_settings.reverse_proxy,
@@ -796,7 +807,18 @@ async function calculateLogitBias() {
 }
 
 function countTokens(messages, full = false) {
-    let chatId = selected_group ? selected_group : characters[this_chid].chat;
+    let chatId = 'undefined';
+    
+    try {
+        if (selected_group) {
+            chatId = groups.find(x => x.id == selected_group)?.chat_id;
+        }
+        else if (this_chid) {
+            chatId = characters[this_chid].chat;
+        }
+    } catch {
+        console.log('No character / group selected. Using default cache item');
+    }
 
     if (typeof tokenCache[chatId] !== 'object') {
         tokenCache[chatId] = {};
@@ -864,6 +886,7 @@ function loadOpenAISettings(data, settings) {
     oai_settings.temp_openai = settings.temp_openai ?? default_settings.temp_openai;
     oai_settings.freq_pen_openai = settings.freq_pen_openai ?? default_settings.freq_pen_openai;
     oai_settings.pres_pen_openai = settings.pres_pen_openai ?? default_settings.pres_pen_openai;
+    oai_settings.top_p_openai = settings.top_p_openai ?? default_settings.top_p_openai;
     oai_settings.stream_openai = settings.stream_openai ?? default_settings.stream_openai;
     oai_settings.openai_max_context = settings.openai_max_context ?? default_settings.openai_max_context;
     oai_settings.openai_max_tokens = settings.openai_max_tokens ?? default_settings.openai_max_tokens;
@@ -910,6 +933,9 @@ function loadOpenAISettings(data, settings) {
 
     $('#pres_pen_openai').val(oai_settings.pres_pen_openai);
     $('#pres_pen_counter_openai').text(Number(oai_settings.pres_pen_openai).toFixed(2));
+
+    $('#top_p_openai').val(oai_settings.top_p_openai);
+    $('#top_p_counter_openai').text(Number(oai_settings.top_p_openai).toFixed(2));
 
     if (settings.reverse_proxy !== undefined) oai_settings.reverse_proxy = settings.reverse_proxy;
     $('#openai_reverse_proxy').val(oai_settings.reverse_proxy);
@@ -996,6 +1022,7 @@ async function saveOpenAIPreset(name, settings) {
         temperature: settings.temp_openai,
         frequency_penalty: settings.freq_pen_openai,
         presence_penalty: settings.pres_pen_openai,
+        top_p: settings.top_p_openai,
         openai_max_context: settings.openai_max_context,
         openai_max_tokens: settings.openai_max_tokens,
         nsfw_toggle: settings.nsfw_toggle,
@@ -1260,6 +1287,7 @@ function onSettingsPresetChange() {
         temperature: ['#temp_openai', 'temp_openai', false],
         frequency_penalty: ['#freq_pen_openai', 'freq_pen_openai', false],
         presence_penalty: ['#pres_pen_openai', 'pres_pen_openai', false],
+        top_p: ['#top_p_openai', 'top_p_openai', false],
         openai_model: ['#model_openai_select', 'openai_model', false],
         openai_max_context: ['#openai_max_context', 'openai_max_context', false],
         openai_max_tokens: ['#openai_max_tokens', 'openai_max_tokens', false],
@@ -1360,6 +1388,13 @@ $(document).ready(function () {
     $(document).on('input', '#pres_pen_openai', function () {
         oai_settings.pres_pen_openai = $(this).val();
         $('#pres_pen_counter_openai').text(Number($(this).val()).toFixed(2));
+        saveSettingsDebounced();
+
+    });
+
+    $(document).on('input', '#top_p_openai', function () {
+        oai_settings.top_p_openai = $(this).val();
+        $('#top_p_counter_openai').text(Number($(this).val()).toFixed(2));
         saveSettingsDebounced();
 
     });

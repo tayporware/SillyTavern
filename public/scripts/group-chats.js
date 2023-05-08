@@ -5,7 +5,7 @@ import {
     delay,
 } from './utils.js';
 import { RA_CountCharTokens, humanizedDateTime } from "./RossAscends-mods.js";
-import { sortCharactersList } from './power-user.js';
+import { sortCharactersList, sortGroupMembers } from './power-user.js';
 
 import {
     chat,
@@ -45,6 +45,7 @@ import {
     setMenuType,
     menu_type,
     select_selected_character,
+    cancelTtsPlay,
 } from "../script.js";
 import { appendTagToList, createTagMapFromList, getTagsList, applyTagsOnCharacterSelect } from './tags.js';
 
@@ -191,6 +192,7 @@ function resetSelectedGroup() {
 async function saveGroupChat(groupId, shouldSaveGroup) {
     const group = groups.find(x => x.id == groupId);
     const chat_id = group.chat_id;
+    group['date_last_chat'] = Date.now();
     const response = await fetch("/savegroupchat", {
         method: "POST",
         headers: getRequestHeaders(),
@@ -200,6 +202,7 @@ async function saveGroupChat(groupId, shouldSaveGroup) {
     if (shouldSaveGroup && response.ok) {
         await editGroup(groupId);
     }
+    sortCharactersList();
 }
 
 export async function renameGroupMember(oldAvatar, newAvatar, newName) {
@@ -375,7 +378,7 @@ function getGroupAvatar(group) {
 }
 
 
-async function generateGroupWrapper(by_auto_mode, type = null, force_chid = null, params = {}) {
+async function generateGroupWrapper(by_auto_mode, type = null, params = {}) {
     if (online_status === "no_connection") {
         is_group_generating = false;
         setSendButtonState(false);
@@ -438,8 +441,8 @@ async function generateGroupWrapper(by_auto_mode, type = null, force_chid = null
         const activationStrategy = Number(group.activation_strategy ?? group_activation_strategy.NATURAL);
         let activatedMembers = [];
 
-        if (typeof force_chid == 'number') {
-            activatedMembers = [force_chid];
+        if (params && typeof params.force_chid == 'number') {
+            activatedMembers = [params.force_chid];
         } else if (type === "quiet") {
             activatedMembers = activateSwipe(group.members);
 
@@ -449,11 +452,11 @@ async function generateGroupWrapper(by_auto_mode, type = null, force_chid = null
 
             const resolveOriginal = params.resolve;
             const rejectOriginal = params.reject;
-            params.resolve = function() {
+            params.resolve = function () {
                 isQuietGenDone = true;
                 resolveOriginal.apply(this, arguments);
             };
-            params.reject = function() {
+            params.reject = function () {
                 isQuietGenDone = true;
                 rejectOriginal.apply(this, arguments);
             }
@@ -898,7 +901,7 @@ function select_group_chats(groupId, skipAnimation) {
         }
     }
 
-    sortCharactersList("#rm_group_add_members .group_member");
+    sortGroupMembers("#rm_group_add_members .group_member");
     filterMembersByFavorites(false);
 
     const groupHasMembers = !!$("#rm_group_members").children().length;
@@ -909,9 +912,11 @@ function select_group_chats(groupId, skipAnimation) {
     if (groupId) {
         $("#rm_group_submit").hide();
         $("#rm_group_delete").show();
+        $("#rm_group_scenario").show();
     } else {
         $("#rm_group_submit").show();
         $("#rm_group_delete").hide();
+        $("#rm_group_scenario").hide();
     }
 
     $("#rm_group_delete").off();
@@ -982,11 +987,11 @@ function select_group_chats(groupId, skipAnimation) {
         if (action === 'speak') {
             const chid = Number(member.attr('chid'));
             if (Number.isInteger(chid)) {
-                generateGroupWrapper(false, null, chid);
+                Generate('normal', { force_chid: chid });
             }
         }
 
-        sortCharactersList("#rm_group_add_members .group_member");
+        sortGroupMembers("#rm_group_add_members .group_member");
     });
 }
 
@@ -1002,6 +1007,7 @@ async function selectGroup() {
 
     if (!is_send_press && !is_group_generating) {
         if (selected_group !== groupId) {
+            cancelTtsPlay();
             selected_group = groupId;
             setCharacterId(undefined);
             setCharacterName('');
@@ -1010,9 +1016,6 @@ async function selectGroup() {
             updateChatMetadata({}, true);
             chat.length = 0;
             await getGroupChat(groupId);
-            //to avoid the filter being lit up yellow and left at true while the list of character and group reseted.
-            $("#filter_by_fav").removeClass("fav_on");
-            filterByFav = false;
         }
 
         select_group_chats(groupId);
@@ -1063,7 +1066,7 @@ async function createGroup() {
     const memberNames = characters.filter(x => members.includes(x.avatar)).map(x => x.name).join(", ");
 
     if (!name) {
-        name = `Chat with ${memberNames}`;
+        name = `Group: ${memberNames}`;
     }
 
     // placeholder
@@ -1192,10 +1195,12 @@ export async function openGroupChat(groupId, chatId) {
     group.past_metadata[previousChat] = Object.assign({}, chat_metadata);
     group.chat_id = chatId;
     group.chat_metadata = group.past_metadata[chatId] || {};
+    group['date_last_chat'] = Date.now();
     updateChatMetadata(group.chat_metadata, true);
 
     await editGroup(groupId, true);
     await getGroupChat(groupId);
+    sortCharactersList();
 }
 
 export async function renameGroupChat(groupId, oldChatId, newChatId) {
@@ -1264,11 +1269,35 @@ export async function saveGroupBookmarkChat(groupId, name, metadata) {
     });
 }
 
+function setGroupScenario() {
+    if (!selected_group) {
+        return;
+    }
+
+    const template = $('#group_scenario_template .group_scenario').clone();
+    const metadataValue = chat_metadata['scenario'] || '';
+    template.find('.group_chat_scenario').text(metadataValue);
+    callPopup(template.get(0).outerHTML, 'text');
+}
+
+function onGroupScenarioInput() {
+    const value = $(this).val();
+    const metadata = { scenario: value, };
+    updateChatMetadata(metadata, false);
+}
+
+function onGroupScenarioRemoveClick() {
+    $(this).closest('.group_scenario').find('.group_chat_scenario').val('').trigger('input');
+}
+
 jQuery(() => {
     $(document).on("click", ".group_select", selectGroup);
+    $(document).on("input", ".group_chat_scenario", onGroupScenarioInput);
+    $(document).on("click", ".remove_scenario_override", onGroupScenarioRemoveClick);
     $("#rm_group_filter").on("input", filterGroupMembers);
     $("#group_fav_filter").on("click", toggleFilterByFavorites);
     $("#rm_group_submit").on("click", createGroup);
+    $("#rm_group_scenario").on("click", setGroupScenario);
     $("#rm_group_automode").on("input", function () {
         const value = $(this).prop("checked");
         is_group_automode_enabled = value;

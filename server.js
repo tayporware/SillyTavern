@@ -305,6 +305,19 @@ app.get('/deviceinfo', function (request, response) {
     const deviceInfo = deviceDetector.parse(userAgent);
     return response.send(deviceInfo);
 });
+app.get('/version', function (_, response) {
+    let pkgVersion, gitRevision;
+    try {
+        const pkgJson = require('./package.json');
+        pkgVersion = pkgJson.version;
+        gitRevision = require('child_process')
+            .execSync('git rev-parse --short HEAD', { cwd: __dirname })
+            .toString().trim();
+    }
+    finally {
+        response.send(`SillyTavern:${gitRevision || pkgVersion}:Cohee#1207`)
+    }
+})
 
 //**************Kobold api
 app.post("/generate", jsonParser, async function (request, response_generate = response) {
@@ -540,7 +553,7 @@ app.post("/getchat", jsonParser, function (request, response) {
                                 const lines = data.split('\n');
 
                                 // Iterate through the array of strings and parse each line as JSON
-                                const jsonData = lines.map(json5.parse);
+                                const jsonData = lines.map(tryParse).filter(x => x);
                                 response.send(jsonData);
                                 //console.log('read the requested file')
 
@@ -640,6 +653,14 @@ app.post("/setsoftprompt", jsonParser, async function (request, response) {
 
     return response.sendStatus(200);
 });
+
+function tryParse(str) {
+    try {
+        return json5.parse(str);
+    } catch {
+        return undefined;
+    }
+}
 
 function checkServer() {
     api_server = 'http://127.0.0.1:5000';
@@ -1798,10 +1819,36 @@ app.post('/getgroups', jsonParser, (_, response) => {
     }
 
     const files = fs.readdirSync(directories.groups);
+    const chats = fs.readdirSync(directories.groupChats);
+
     files.forEach(function (file) {
-        const fileContents = fs.readFileSync(path.join(directories.groups, file), 'utf8');
-        const group = json5.parse(fileContents);
-        groups.push(group);
+        try {
+            const filePath = path.join(directories.groups, file);
+            const fileContents = fs.readFileSync(filePath, 'utf8');
+            const group = json5.parse(fileContents);
+            const groupStat = fs.statSync(filePath);
+            group['date_added'] = groupStat.birthtimeMs;
+
+            let chat_size = 0;
+            let date_last_chat = 0;
+
+            if (Array.isArray(group.chats) && Array.isArray(chats)) {
+                for (const chat of chats) {
+                    if (group.chats.includes(path.parse(chat).name)) {
+                        const chatStat = fs.statSync(path.join(directories.groupChats, chat));
+                        chat_size += chatStat.size;
+                        date_last_chat = Math.max(date_last_chat, chatStat.mtimeMs);
+                    }
+                }
+            }
+
+            group['date_last_chat'] = date_last_chat;
+            group['chat_size'] = chat_size;
+            groups.push(group);
+        }
+        catch (error) {
+            console.error(error);
+        }
     });
 
     return response.send(groups);

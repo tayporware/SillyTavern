@@ -6,7 +6,8 @@ import {
     showSwipeButtons
 } from "../../../script.js";
 import { getApiUrl, getContext, extension_settings, defaultRequestArgs } from "../../extensions.js";
-import { stringFormat } from "../../utils.js";
+import { stringFormat, initScrollHeight, resetScrollHeight } from "../../utils.js";
+export { MODULE_NAME };
 
 // Wraps a string into monospace font-face span
 const m = x => `<span class="monospace">${x}</span>`;
@@ -15,9 +16,12 @@ const j = a => a.join(' / ');
 // Wraps a string into paragraph block
 const p = a => `<p>${a}</p>`
 
+const MODULE_NAME = 'sd';
+const UPDATE_INTERVAL = 1000;
+
 const postHeaders = {
-'Content-Type': 'application/json',
-'Bypass-Tunnel-Reminder': 'bypass',
+    'Content-Type': 'application/json',
+    'Bypass-Tunnel-Reminder': 'bypass',
 };
 
 const generationMode = {
@@ -25,19 +29,28 @@ const generationMode = {
     USER: 1,
     SCENARIO: 2,
     FREE: 3,
+    NOW: 4,
+    FACE: 5,
 }
 
 const triggerWords = {
     [generationMode.CHARACTER]: ['yourself', 'you', 'bot', 'AI', 'character'],
     [generationMode.USER]: ['me', 'user', 'myself'],
     [generationMode.SCENARIO]: ['scenario', 'world', 'surroundings', 'scenery'],
+    [generationMode.NOW]: ['now', 'last'],
+    [generationMode.FACE]: ['selfie', 'face'],
+
 }
 
 const quietPrompts = {
-    [generationMode.CHARACTER]: "[Please provide a detailed description of {{char}}'s appearance]",
-    [generationMode.USER]: "[Please provide a detailed description of {{user}}'s appearance]",
-    [generationMode.SCENARIO]: '[Please provide a detailed description of your surroundings and what you are doing right now]',
-    [generationMode.FREE]: '[Please provide a detailed and vivid description of {0}]',
+    //face-specific prompt
+    [generationMode.FACE]: "[Provide a description of {{char}}'s face and head in the form of a comma-delimited list of keywords and phrases. Do not describe anything below their neck. Ignore {{char}} personality traits and the chat history when crafting this description. Do not roleplay as {{char}} when writing this description, and do not attempt to continue the story.]",
+    //prompt for only the last message
+    [generationMode.NOW]: "[Pause your roleplay and provide a brief description of the last chat message. Focus on visual details, clothing, actions. Ignore the emotions and thoughts of {{char}} and {{user}} as well as any spoken dialog. Do not roleplay as {{char}} while writing this description. Do not continue the roleplay story.]",
+    [generationMode.CHARACTER]: "[Pause your roleplay and provide comma-delimited list of phrases and keywords which describe {{char}}'s physical appearance and clothing. Ignore {{char}}'s personality traits, and chat history when crafting this description. End your response once the comma-delimited list is complete. Do not roleplay as {{char}}}} when writing this description, and do not attempt to continue the story.]",
+    [generationMode.USER]: "[Pause your roleplay and provide a detailed description of {{user}}'s appearance from the perspective of {{char}} in the form of a comma-delimited list of keywords and phrases. Ignore the rest of the story when crafting this description. Do not roleplay as {{char}}}} when writing this description, and do not attempt to continue the story.]",
+    [generationMode.SCENARIO]: "[Pause your roleplay and provide a detailed description for all of the following: a brief recap of recent events in the story, {{char}}'s appearance, and {{char}}'s surroundings. Do not roleplay while writing this description.]",
+    [generationMode.FREE]: "[Pause your roleplay and provide a detailed and vivid description of {0}]",
 }
 
 const helpString = [
@@ -46,6 +59,8 @@ const helpString = [
     `<li>${m(j(triggerWords[generationMode.CHARACTER]))} – AI character image</li>`,
     `<li>${m(j(triggerWords[generationMode.USER]))} – user character image</li>`,
     `<li>${m(j(triggerWords[generationMode.SCENARIO]))} – world scenario image</li>`,
+    `<li>${m(j(triggerWords[generationMode.FACE]))} – character face-up selfie image</li>`,
+    `<li>${m(j(triggerWords[generationMode.NOW]))} – visual recap of the last chat message</li>`,
     '</ul>',
     `Anything else would trigger a "free mode" with AI describing whatever you prompted.`,
 ].join('<br>');
@@ -88,7 +103,10 @@ async function loadSettings() {
     $('#sd_width').val(extension_settings.sd.width).trigger('input');
     $('#sd_height').val(extension_settings.sd.height).trigger('input');
 
+
     await Promise.all([loadSamplers(), loadModels()]);
+
+
 }
 
 function onScaleInput() {
@@ -105,11 +123,13 @@ function onStepsInput() {
 
 function onPromptPrefixInput() {
     extension_settings.sd.prompt_prefix = $('#sd_prompt_prefix').val();
+    resetScrollHeight($(this));
     saveSettingsDebounced();
 }
 
 function onNegativePromptInput() {
     extension_settings.sd.negative_prompt = $('#sd_negative_prompt').val();
+    resetScrollHeight($(this));
     saveSettingsDebounced();
 }
 
@@ -254,11 +274,13 @@ async function generatePicture(_, trigger) {
                 sampler: extension_settings.sd.sampler,
                 steps: extension_settings.sd.steps,
                 scale: extension_settings.sd.scale,
-                model: extension_settings.sd.model,
                 width: extension_settings.sd.width,
                 height: extension_settings.sd.height,
                 prompt_prefix: extension_settings.sd.prompt_prefix,
                 negative_prompt: extension_settings.sd.negative_prompt,
+                restore_faces: true,
+                face_restoration_model: 'GFPGAN',
+
             }),
         });
 
@@ -297,6 +319,104 @@ async function sendMessage(prompt, image) {
     context.saveChat();
 }
 
+function addSDGenButtons() {
+    const buttonHtml = `
+        <div id="sd_gen" class="fa-solid fa-paintbrush" /></div>
+        `;
+
+    const waitButtonHtml = `
+        <div id="sd_gen_wait" class="fa-solid fa-hourglass-half" /></div>
+    `
+    const dropdownHtml = `
+    <div id="sd_dropdown">
+    <span>Send me a picture of:</span>
+        <ul class="list-group">
+            <li class="list-group-item" id="sd_you" data-value="you">Yourself</li>
+            <li class="list-group-item" id="sd_face" data-value="face">Your Face</li>
+            <li class="list-group-item" id="sd_me" data-value="me">Me</li>
+            <li class="list-group-item" id="sd_world" data-value="world">The Whole Story</li>
+            <li class="list-group-item" id="sd_last" data-value="last">The Last Message</li>
+        </ul>
+    </div>`;
+
+    $('#send_but_sheld').prepend(buttonHtml);
+    $('#send_but_sheld').prepend(waitButtonHtml);
+    $(document.body).append(dropdownHtml)
+
+    const button = $('#sd_gen');
+    const waitButton = $("#sd_gen_wait");
+    const dropdown = $('#sd_dropdown');
+    waitButton.hide();
+    dropdown.hide();
+    button.hide();
+
+    let popper = Popper.createPopper(button.get(0), dropdown.get(0), {
+        placement: 'top-start',
+    });
+
+    $(document).on('click touchend', function (e) {
+        const target = $(e.target);
+        if (target.is(dropdown)) return;
+        if (target.is(button) && !dropdown.is(":visible") && $("#send_but").css('display') === 'flex') {
+            e.preventDefault();
+
+            dropdown.show(200);
+            popper.update();
+        } else {
+            dropdown.hide(200);
+        }
+    });
+}
+
+async function moduleWorker() {
+    const context = getContext();
+
+    /*     if (context.onlineStatus === 'no_connection') {
+            $('#sd_gen').hide(200);
+        } else if ($("#send_but").css('display') === 'flex') {
+            $('#sd_gen').show(200);
+            $("#sd_gen_wait").hide(200);
+        } else {
+            $('#sd_gen').hide(200);
+            $("#sd_gen_wait").show(200);
+        } */
+
+    context.onlineStatus === 'no_connection'
+        ? $('#sd_gen').hide(200)
+        : $('#sd_gen').show(200)
+}
+
+addSDGenButtons();
+setInterval(moduleWorker, UPDATE_INTERVAL);
+
+$("#sd_dropdown [id]").on("click", function () {
+    var id = $(this).attr("id");
+    if (id == "sd_you") {
+        console.log("doing /sd you");
+        generatePicture('sd', 'you');
+    }
+
+    else if (id == "sd_face") {
+        console.log("doing /sd face");
+        generatePicture('sd', 'face');
+    }
+
+    else if (id == "sd_me") {
+        console.log("doing /sd me");
+        generatePicture('sd', 'me');
+    }
+
+    else if (id == "sd_world") {
+        console.log("doing /sd world");
+        generatePicture('sd', 'world');
+    }
+
+    else if (id == "sd_last") {
+        console.log("doing /sd last");
+        generatePicture('sd', 'last');
+    }
+});
+
 jQuery(async () => {
     getContext().registerSlashCommand('sd', generatePicture, ['picture', 'image'], helpString, true, true);
 
@@ -322,7 +442,7 @@ jQuery(async () => {
             <label for="sd_sampler">Sampling method</label>
             <select id="sd_sampler"></select>
             <label for="sd_prompt_prefix">Generated prompt prefix</label>
-            <textarea id="sd_prompt_prefix" class="text_pole textarea_compact" rows="1"></textarea>
+            <textarea id="sd_prompt_prefix" class="text_pole textarea_compact" rows="2"></textarea>
             <label for="sd_negative_prompt">Negative prompt</label>
             <textarea id="sd_negative_prompt" class="text_pole textarea_compact" rows="2"></textarea>
         </div>
@@ -337,5 +457,12 @@ jQuery(async () => {
     $('#sd_negative_prompt').on('input', onNegativePromptInput);
     $('#sd_width').on('input', onWidthInput);
     $('#sd_height').on('input', onHeightInput);
+
+    $('.sd_settings .inline-drawer-toggle').on('click', function () {
+        initScrollHeight($("#sd_prompt_prefix"));
+        initScrollHeight($("#sd_negative_prompt"));
+    })
+
     await loadSettings();
+
 });

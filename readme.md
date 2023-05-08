@@ -1,6 +1,6 @@
 # SillyTavern
 ## Based on a fork of TavernAI 1.2.8
-### Brought to you by Cohee and RossAscends
+### Brought to you by Cohee, RossAscends and the SillyTavern community
 
 NOTE: We have added [a FAQ](faq.md) to answer most of your questions and help you get started.
 
@@ -185,14 +185,28 @@ Try enabling the No Blur Effect (Fast UI) mode on the User settings panel.
 2. Send bug reports without providing any context
 3. Ask the questions that were already answered numerous times
 
+## Where can I find the old backgrounds?
+
+We're moving to 100% original content only policy, so old background images have been removed from this repository.
+
+You can find them archived here:
+
+https://files.catbox.moe/1xevnc.zip
+
 ## Screenshots
 <img width="400" alt="image" src="https://user-images.githubusercontent.com/18619528/228649245-8061c60f-63dc-488e-9325-f151b7a3ec2d.png">
 <img width="400" alt="image" src="https://user-images.githubusercontent.com/18619528/228649856-fbdeef05-d727-4d5a-be80-266cbbc6b811.png">
 
 ## License and credits
+
+**This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.**
+
 * TAI Base by Humi: Unknown license
-* Cohee's TAI mod: Public domain
-* RossAscends' additions: Public domain
+* Cohee's modifications and derived code: AGPL v3
+* RossAscends' additions: AGPL v3
 * Portions of CncAnon's TavernAITurbo mod: Unknown license
 * Waifu mode inspired by the work of PepperTaco (https://github.com/peppertaco/Tavern/)
 * Thanks Pygmalion University for being awesome testers and suggesting cool features! 

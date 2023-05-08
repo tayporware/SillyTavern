@@ -1,8 +1,9 @@
-import { callPopup, saveSettingsDebounced } from '../../../script.js'
+import { callPopup, isMultigenEnabled, is_send_press, saveSettingsDebounced } from '../../../script.js'
 import { extension_settings, getContext } from '../../extensions.js'
 import { getStringHash } from '../../utils.js'
 import { ElevenLabsTtsProvider } from './elevenlabs.js'
 import { SileroTtsProvider } from './silerotts.js'
+import { SystemTtsProvider } from './system.js'
 
 const UPDATE_INTERVAL = 1000
 
@@ -17,7 +18,8 @@ let lastMessageHash = null
 
 let ttsProviders = {
     ElevenLabs: ElevenLabsTtsProvider,
-    Silero: SileroTtsProvider
+    Silero: SileroTtsProvider,
+    System: SystemTtsProvider,
 }
 let ttsProvider
 let ttsProviderName
@@ -39,6 +41,11 @@ async function moduleWorker() {
     // no characters or group selected
     if (!context.groupId && context.characterId === undefined) {
         return
+    }
+
+    // Multigen message is currently being generated
+    if (is_send_press && isMultigenEnabled()) {
+        return;
     }
 
     // Chat/character/group changed
@@ -112,7 +119,13 @@ async function playAudioData(audioBlob) {
 
 window['tts_preview'] = function (id) {
     const audio = document.getElementById(id)
-    audio.play()
+
+    if (!$(audio).data('disabled')) {
+        audio.play()
+    }
+    else {
+        ttsProvider.previewTtsVoice(id)
+    }
 }
 
 async function onTtsVoicesClick() {
@@ -122,8 +135,8 @@ async function onTtsVoicesClick() {
         const voiceIds = await ttsProvider.fetchTtsVoiceIds()
 
         for (const voice of voiceIds) {
-            popupText += `<div class="voice_preview"><b>${voice.name}</b> <i onclick="tts_preview('${voice.voice_id}')" class="fa-solid fa-play"></i></div>`
-            popupText += `<audio id="${voice.voice_id}" src="${voice.preview_url}"></audio>`
+            popupText += `<div class="voice_preview"><span class="voice_lang">${voice.lang || ''}</span> <b class="voice_name">${voice.name}</b> <i onclick="tts_preview('${voice.voice_id}')" class="fa-solid fa-play"></i></div>`
+            popupText += `<audio id="${voice.voice_id}" src="${voice.preview_url}" data-disabled="${voice.preview_url == false}"></audio>`
         }
     } catch {
         popupText = 'Could not load voices list. Check your API key.'
@@ -227,7 +240,9 @@ async function processTtsQueue() {
 
     console.debug('New message found, running TTS')
     currentTtsJob = ttsJobQueue.shift()
-    const text = currentTtsJob.mes.replaceAll('*', '...')
+    const text = extension_settings.tts.narrate_dialogues_only
+        ? currentTtsJob.mes.replace(/\*[^\*]*?(\*|$)/g, '') // remove asterisks content
+        : currentTtsJob.mes.replaceAll('*', '') // remove just the asterisks
     const char = currentTtsJob.name
 
     try {
@@ -266,6 +281,7 @@ function loadSettings() {
         'checked',
         extension_settings.tts.enabled
     )
+    $('#tts_narrate_dialogues').prop('checked', extension_settings.tts.narrate_dialogues_only)
 }
 
 const defaultSettings = {
@@ -353,6 +369,11 @@ function onEnableClick() {
 }
 
 
+function onNarrateDialoguesClick() {
+    extension_settings.tts.narrate_dialogues_only = $('#tts_narrate_dialogues').prop('checked');
+    saveSettingsDebounced()
+}
+
 //##############//
 // TTS Provider //
 //##############//
@@ -428,6 +449,10 @@ $(document).ready(function () {
                             <input type="checkbox" id="tts_enabled" name="tts_enabled">
                             Enabled
                         </label>
+                        <label class="checkbox_label" for="tts_narrate_dialogues">
+                            <input type="checkbox" id="tts_narrate_dialogues">
+                            Narrate dialogues only
+                        </label>
                     </div>
                     <label>Voice Map</label>
                     <textarea id="tts_voice_map" type="text" class="text_pole textarea_compact" rows="4"
@@ -449,6 +474,7 @@ $(document).ready(function () {
         $('#extensions_settings').append(settingsHtml)
         $('#tts_apply').on('click', onApplyClick)
         $('#tts_enabled').on('click', onEnableClick)
+        $('#tts_narrate_dialogues').on('click', onNarrateDialoguesClick);
         $('#tts_voices').on('click', onTtsVoicesClick)
         $('#tts_provider_settings').on('input', onTtsProviderSettingsInput)
         for (const provider in ttsProviders) {

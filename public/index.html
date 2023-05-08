@@ -417,6 +417,21 @@
                                         </div>
                                     </div>
                                 </div>
+                                <div class="range-block">
+                                    <div class="range-block-title">
+                                        Top-p
+                                    </div>
+                                    <div class="range-block-range-and-counter">
+                                        <div class="range-block-range">
+                                            <input type="range" id="top_p_openai" name="volume" min="0" max="1" step="0.01">
+                                        </div>
+                                        <div class="range-block-counter">
+                                            <div contenteditable="true" data-for="top_p_openai" id="top_p_counter_openai">
+                                                select
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                             <div id="range_block_poe">
                                 <div class="range-block">
@@ -713,31 +728,43 @@
                             <div id="openai_settings">
                                 <div class="">
                                     <div class="range-block">
-                                        <label class="checkbox_label" for="nsfw_toggle">
-                                            <input id="nsfw_toggle" type="checkbox" checked>
-                                            NSFW Toggle
-                                        </label>
-                                    </div>
-                                    <div class="range-block">
-                                        <label title="NSFW block goes first in the resulting prompt" class="checkbox_label widthFreeExpand">
-                                            <input id="nsfw_first" type="checkbox" />
-                                            NSFW first
-                                        </label>
-                                        <div class="toggle-description justifyLeft">NSFW block goes first in the resulting prompt</div>
-                                    </div>
-                                    <div class="range-block">
                                         <label title="Inserts jailbreak as a last system message" class="checkbox_label widthFreeExpand">
                                             <input id="jailbreak_system" type="checkbox" />
                                             Send Jailbreak
                                         </label>
-                                        <div class="toggle-description justifyLeft">Inserts jailbreak as a last system message</div>
+                                        <div class="toggle-description justifyLeft">
+                                            Inserts jailbreak as a last system message.<br>
+                                            This tells the AI to ignore its usual content restrictions.
+                                        </div>
                                     </div>
+                                    <div class="range-block">
+                                        <label class="checkbox_label  widthFreeExpand" for="nsfw_toggle">
+                                            <input id="nsfw_toggle" type="checkbox" checked>
+                                            NSFW Encouraged
+                                        </label>
+                                        <div class="toggle-description justifyLeft">
+                                            Tell the AI that NSFW is allowed.
+                                        </div>
+                                    </div>
+                                    <div class="range-block">
+                                        <label title="NSFW block goes first in the resulting prompt" class="checkbox_label widthFreeExpand">
+                                            <input id="nsfw_first" type="checkbox" />
+                                            NSFW Prioritized
+                                        </label>
+                                        <div class="toggle-description justifyLeft">
+                                            NSFW prompt text goes first in the prompt to emphasize its effect.
+                                        </div>
+                                    </div>
+
                                     <div class="range-block">
                                         <label for="stream_toggle" title="Enables OpenAI completion streaming" class="checkbox_label widthFreeExpand">
                                             <input id="stream_toggle" type="checkbox" />
                                             Streaming
                                         </label>
-                                        <div class="toggle-description justifyLeft">Enables OpenAI completion streaming</div>
+                                        <div class="toggle-description justifyLeft">
+                                            Display the response bit by bit as it is generated.<br>
+                                            When this is off, responses will be displayed all at once when they are complete.
+                                        </div>
                                     </div>
                                     <div class="range-block">
                                         <label title="Use OAI knowledge base to enhance definitions for public figures and known fictional characters" class="checkbox_label widthFreeExpand">
@@ -754,7 +781,7 @@
                                             Wrap in Quotes
                                         </label>
                                         <div class="toggle-description justifyLeft">
-                                            Wrap entire user message in quotes before sending.
+                                            Wrap entire user message in quotes before sending.<br>
                                             Leave off if you use quotes manually for speech.
                                         </div>
                                     </div>
@@ -960,8 +987,6 @@
                                 Use Horde
                             </label>
 
-
-
                             <div id="kobold_api_block">
                                 <h4>API url</h4>
                                 <h5>Example: http://127.0.0.1:5000/api </h5>
@@ -979,9 +1004,14 @@
                                     </li>
                                 </ul>
 
-                                <label for="horde_auto_adjust" class="checkbox_label">
-                                    <input id="horde_auto_adjust" type="checkbox" />
-                                    Adjust generation to worker capabilities
+                                <label for="horde_auto_adjust_context_length" class="checkbox_label">
+                                    <input id="horde_auto_adjust_context_length" type="checkbox" />
+                                    Adjust context size to worker capabilities
+                                </label>
+
+                                <label for="horde_auto_adjust_response_length" class="checkbox_label">
+                                    <input id="horde_auto_adjust_response_length" type="checkbox" />
+                                    Adjust response length to worker capabilities
                                 </label>
                                 <h4>API key</h4>
                                 <h5>Get it here: <a target="_blank" href="https://horde.koboldai.net/register">Register</a>
@@ -993,7 +1023,8 @@
                                         <div class="fa-solid fa-repeat "></div>
                                     </div>
                                 </h4>
-                                <select id="horde_model">
+                                <small class="horde_multiple_hint">Hold Control / Command key to select multiple models.</small>
+                                <select id="horde_model" multiple>
                                     <option>-- Horde models not loaded --</option>
                                 </select>
                             </div>
@@ -1210,6 +1241,15 @@
                                 <option value="3">Sentencepiece (LLaMA)</option>
                             </select>
                         </div>
+                        <div class="range-block">
+                            <div class="range-block-title justifyLeft">
+                                Token Padding
+                                <a href="/notes#tokenpadding" class="notes-link" target="_blank">
+                                    <span class="note-link-span">?</span>
+                                </a>
+                            </div>
+                            <input id="token_padding" class="text_pole" type="number" min="-2048" max="2048" />
+                        </div>
                         <label class="checkbox_label" for="always-force-name2-checkbox">
                             <input id="always-force-name2-checkbox" type="checkbox" />
                             Always add character's name to prompt
@@ -1282,19 +1322,50 @@
                         <div id="world_info_edit_button" class="menu_button fa-solid fa-pencil" title="Details"></div>
                     </div>
 
-                    <div id="world_info_depth_block">
-                        <h4>
-                            Scan Depth <a href="/notes#scandepth" class="notes-link" target="_blank"><span class="note-link-span">?</span></a>
-                        </h4>
-                        <label for="world_info_depth" id="world_info_depth_counter">depth</label>
-                        <input type="range" id="world_info_depth" name="volume" min="1" max="10" step="1">
-                    </div>
-                    <div id="world_info_budget_block">
-                        <h4>
-                            Token Budget <a href="/notes#budget" class="notes-link" target="_blank"><span class="note-link-span">?</span></a>
-                        </h4>
-                        <label for="world_info_budget" id="world_info_budget_counter">budget</label>
-                        <input type="range" id="world_info_budget" name="volume" min="32" max="2048" step="16">
+                    <div class="flex-container alignitemscenter">
+                        <div class="flex1 range-block">
+                            <div class="range-block-title">
+                                Scan Depth <a href="/notes#scandepth" class="notes-link" target="_blank"><span class="note-link-span">?</span></a>
+                            </div>
+                            <div class="range-block-range-and-counter">
+                                <div class="range-block-range">
+                                    <input type="range" id="world_info_depth" name="volume" min="1" max="10" step="1">
+                                </div>
+                                <div class="range-block-counter">
+                                    <div contenteditable="true" data-for="world_info_depth" id="world_info_depth_counter">
+                                        depth
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="flex1 range-block">
+                            <div class="range-block-title">
+                                Token Budget <a href="/notes#budget" class="notes-link" target="_blank"><span class="note-link-span">?</span></a>
+                            </div>
+                            <div class="range-block-range-and-counter">
+                                <div class="range-block-range">
+                                    <input type="range" id="world_info_budget" name="volume" min="32" max="2048" step="16">
+                                </div>
+                                <div class="range-block-counter">
+                                    <div contenteditable="true" data-for="world_info_budget" id="world_info_budget_counter">
+                                        budget
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="flex1 range-block">
+                            <label title="Entries can activate other entries by mentioning their keywords" class="checkbox_label">
+                                <input id="world_info_recursive" type="checkbox" />
+                                <span>
+                                    Recursive scanning
+                                    <a href="/notes#recursivescanning" class="notes-link" target="_blank">
+                                        <span class="note-link-span">?</span>
+                                    </a>
+                                </span>
+                            </label>
+                        </div>
                     </div>
                 </div>
                 <div id="softprompt_block">
@@ -1317,54 +1388,6 @@
                     <div name="UI Customization" class="flex-container drawer25pWidth">
                         <div class="ui-settings">
                             <h4>UI Customization</h4>
-                            <div id="font-blur-UIpresets-block" class="flex-container flexFlowColumn">
-                                <div id="font-scale-block" class="range-block">
-                                    <div class="range-block-title">
-                                        Font Scale
-                                    </div>
-                                    <div class="range-block-range-and-counter">
-                                        <div class="range-block-range">
-                                            <input type="range" id="font_scale" name="font_scale" min="0.8" max="1.2" step="0.05">
-                                        </div>
-                                        <div class="range-block-counter">
-                                            <div contenteditable="true" data-for="font_scale" id="font_scale_counter">
-                                                select
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div id="blur-strength-block" class="range-block">
-                                    <div class="range-block-title">
-                                        Blur Strength
-                                    </div>
-                                    <div class="range-block-range-and-counter">
-                                        <div class="range-block-range">
-                                            <input type="range" id="blur_strength" name="blur_strength" min="0" max="30" step="1">
-                                        </div>
-                                        <div class="range-block-counter">
-                                            <div contenteditable="true" data-for="blur_strength" id="blur_strength_counter">
-                                                select
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div id="shadow-width-block" class="range-block">
-                                    <div class="range-block-title">
-                                        Text Shadow Width
-                                    </div>
-                                    <div class="range-block-range-and-counter">
-                                        <div class="range-block-range">
-                                            <input type="range" id="shadow_width" name="shadow_width" min="0" max="5" step="1">
-                                        </div>
-                                        <div class="range-block-counter">
-                                            <div contenteditable="true" data-for="shadow_width" id="shadow_width_counter">
-                                                select
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                            </div>
                             <div>
                                 Avatar Style:<br>
                                 <label>
@@ -1412,6 +1435,16 @@
                                     ♡ Waifu Mode ♡
                                 </label>
 
+                                <label for="messageTimerEnabled" class="checkbox_label">
+                                    <input id="messageTimerEnabled" type="checkbox" />
+                                    Message Timer
+                                </label>
+
+                                <label for="hotswapEnabled" class="checkbox_label">
+                                    <input id="hotswapEnabled" type="checkbox" />
+                                    Characters Hotswap
+                                </label>
+
                                 <label for="movingUImode" class="checkbox_label">
                                     <input id="movingUImode" type="checkbox" />
                                     Movable UI Panels
@@ -1448,6 +1481,53 @@
                             <div class="flex-container">
                                 <toolcool-color-picker id="blur-tint-color-picker"></toolcool-color-picker>
                                 Blur Tint
+                            </div>
+                            <div id="font-blur-UIpresets-block" class="flex-container flexFlowColumn">
+                                <div id="font-scale-block" class="range-block">
+                                    <div class="range-block-title">
+                                        Font Scale
+                                    </div>
+                                    <div class="range-block-range-and-counter">
+                                        <div class="range-block-range">
+                                            <input type="range" id="font_scale" name="font_scale" min="0.8" max="1.2" step="0.05">
+                                        </div>
+                                        <div class="range-block-counter">
+                                            <div contenteditable="true" data-for="font_scale" id="font_scale_counter">
+                                                select
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div id="blur-strength-block" class="range-block">
+                                    <div class="range-block-title">
+                                        Blur Strength
+                                    </div>
+                                    <div class="range-block-range-and-counter">
+                                        <div class="range-block-range">
+                                            <input type="range" id="blur_strength" name="blur_strength" min="0" max="30" step="1">
+                                        </div>
+                                        <div class="range-block-counter">
+                                            <div contenteditable="true" data-for="blur_strength" id="blur_strength_counter">
+                                                select
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div id="shadow-width-block" class="range-block">
+                                    <div class="range-block-title">
+                                        Text Shadow Width
+                                    </div>
+                                    <div class="range-block-range-and-counter">
+                                        <div class="range-block-range">
+                                            <input type="range" id="shadow_width" name="shadow_width" min="0" max="5" step="1">
+                                        </div>
+                                        <div class="range-block-counter">
+                                            <div contenteditable="true" data-for="shadow_width" id="shadow_width_counter">
+                                                select
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                             <div id="UI-presets-block" class="flex-container flexFlowColumn">
                                 <h4>
@@ -1494,6 +1574,14 @@
                             <label for="auto_fix_generated_markdown">
                                 <input id="auto_fix_generated_markdown" type="checkbox" />
                                 Auto-fix Markdown
+                            </label>
+                            <label class="checkbox_label" for="allow_name2_display">
+                                <input id="allow_name2_display" type="checkbox" />
+                                Allow {{char}}: in bot messages
+                            </label>
+                            <label class="checkbox_label" for="allow_name1_display">
+                                <input id="allow_name1_display" type="checkbox" />
+                                Allow {{user}}: in bot messages
                             </label>
                             <label for="auto_scroll_chat_to_bottom">
                                 <input id="auto_scroll_chat_to_bottom" type="checkbox" />
@@ -1632,14 +1720,16 @@
                     </div>
                     <div id="right-nav-panel-tabs">
                         <div class="right_menu_button fa-solid fa-list-ul" id="rm_button_characters" title="Select/Create Characters"></div>
-                        <div class="right_menu_button" id="rm_button_selected_ch">
+                        <div id="rm_button_selected_ch">
                             <h2></h2>
                         </div>
                     </div>
                 </div>
 
+                <div class="hotswap flex-container justifyCenter">
+                </div>
 
-                <div id="rm_ch_create_block" class="right_menu flex-container flexFlowColumn" style="display: none;">
+                <div name="Solo Char Create/Edit Panel" id="rm_ch_create_block" class="right_menu flex-container flexFlowColumn" style="display: none;">
                     <form id="form_create" action="javascript:void(null);" method="post" enctype="multipart/form-data">
 
                         <div id="avatar-and-name-block">
@@ -1716,90 +1806,123 @@
                         <!-- now back to normal divs for display purposes-->
                     </form>
                 </div>
-                <div id="rm_group_chats_block" class="right_menu">
-                    <div id="rm_group_top_bar">
-                        <div id="rm_button_back_from_group" class="menu_button fa-solid fa-left-long"></div>
-                        <input id="rm_group_chat_name" class="text_pole" type="text" name="chat_name" placeholder="Chat Name (Optional)" maxlength="100" />
-                        <div id="group_favorite_button" class="menu_button fa-solid fa-star" title="Add to Favorites"></div>
-                        <input id="rm_group_fav" type="hidden" />
-                        <div id="rm_group_submit" class="menu_button fa-solid fa-check" title="Create"></div>
-                        <div id="rm_group_delete" class="menu_button fa-solid fa-trash-can" title="Delete"></div>
-                    </div>
-                    <div id="rm_group_buttons">
-                        <div class="flex1">
-                            <h5>
-                                Group reply strategy
-                                <a href="/notes#replyorderstrategies" class="notes-link" target="_blank">
-                                    <span class="note-link-span">?</span>
-                                </a>
-                            </h5>
-                            <label class="checkbox_label">
-                                <input type="radio" name="rm_group_activation_strategy" value="0" />
-                                Natural order
-                            </label>
-                            <label class="checkbox_label">
-                                <input type="radio" name="rm_group_activation_strategy" value="1" />
-                                List order
-                            </label>
+
+                <div name="Group Chat Edit Panel" id="rm_group_chats_block" class="right_menu flex-container flexNoGap">
+
+                    <div class="inline-drawer wide100p flexFlowColumn">
+                        <div id="groupControlsToggle" class="inline-drawer-toggle inline-drawer-header">
+                            Group Controls
+                            <div class="fa-solid fa-circle-chevron-down inline-drawer-icon down"></div>
                         </div>
-                        <div class="flex1">
-                            <label class="checkbox_label">
-                                <input id="rm_group_allow_self_responses" type="checkbox" />
-                                Allow self responses
-                            </label>
-                            <label id="rm_group_automode_label" class="checkbox_label">
-                                <input id="rm_group_automode" type="checkbox" />
-                                Auto Mode
-                            </label>
+                        <div class="inline-drawer-content">
+                            <div name="group-metadata-controls" class="marginTopBot5">
+                                <input id="rm_group_chat_name" class="text_pole" type="text" name="chat_name" placeholder="Chat Name (Optional)" maxlength="100" />
+                                <div id="group_tags_div" class="wide100p">
+                                    <div class="tag_controls">
+                                        <input id="groupTagInput" class="text_pole tag_input flex1" placeholder="Search / Create tags" maxlength="25" />
+                                        <div class="tags_view menu_button fa-solid fa-tags" title="View all tags"></div>
+                                    </div>
+                                    <div id="groupTagList" class="tags paddingTopBot5"></div>
+                                </div>
+                                <div id="rm_group_top_bar" class="flex-container spaceEvenly width100p">
+                                    <div name="GroupStragegyAndOrder" id="rm_group_buttons" class="fontsize80p flex-container paddingLeftRight5">
+                                        <div class="">
+                                            <div class="flex-container flexnowrap width100p whitespacenowrap">
+                                                Group reply strategy
+                                                <a href="/notes#replyorderstrategies" class="notes-link" target="_blank">
+                                                    <span class="note-link-span">?</span>
+                                                </a>
+                                            </div>
+                                            <label class="checkbox_label flexnowrap whitespacenowrap">
+                                                <input type="radio" name="rm_group_activation_strategy" value="0" />
+                                                Natural order
+                                            </label>
+                                            <label class="checkbox_label flexnowrap whitespacenowrap">
+                                                <input type="radio" name="rm_group_activation_strategy" value="1" />
+                                                List order
+                                            </label>
+                                        </div>
+                                        <div class="">
+                                            <label class="checkbox_label whitespacenowrap">
+                                                <input id="rm_group_allow_self_responses" type="checkbox" />
+                                                Allow self responses
+                                            </label>
+                                            <label id="rm_group_automode_label" class="checkbox_label whitespacenowrap">
+                                                <input id="rm_group_automode" type="checkbox" />
+                                                Auto Mode
+                                            </label>
+                                        </div>
+                                    </div>
+                                    <div name="GroupFavDelOkBack" class="flex-container flexGap5 spaceEvenly">
+                                        <div id="rm_button_back_from_group" class="heightFitContent margin0 menu_button fa-solid fa-left-long"></div>
+                                        <div id="rm_group_scenario" class="heightFitContent margin0 menu_button fa-solid fa-scroll" title="Set a group chat scenario"></div>
+                                        <div id="group_favorite_button" class="heightFitContent margin0 menu_button fa-solid fa-star" title="Add to Favorites"></div>
+                                        <input id="rm_group_fav" type="hidden" />
+                                        <div id="rm_group_submit" class="heightFitContent margin0 menu_button fa-solid fa-check" title="Create"></div>
+                                        <div id="rm_group_delete" class="heightFitContent margin0 menu_button fa-solid fa-trash-can" title="Delete"></div>
+                                    </div>
+
+                                </div>
+                            </div>
                         </div>
                     </div>
-                    <div id="group_tags_div" class="wide100p">
-                        <div class="tag_controls">
-                            <input id="groupTagInput" class="text_pole tag_input flex1" placeholder="Search / Create tags" maxlength="25" />
-                            <div class="tags_view menu_button fa-solid fa-tags" title="View all tags"></div>
+                    <div class="inline-drawer wide100p flexFlowColumn">
+                        <div id="groupAddMemberListToggle" class="inline-drawer-toggle inline-drawer-header">
+                            Add Members
+                            <div class="fa-solid fa-circle-chevron-down inline-drawer-icon down"></div>
                         </div>
-                        <div id="groupTagList" class="tags"></div>
+                        <div class="inline-drawer-content">
+                            <div name="Unadded Char List" class="flex-container flexFlowColumn overflowYAuto flex1">
+                                <div id="rm_group_add_members_header">
+                                    <input id="rm_group_filter" class="text_pole" type="search" placeholder="Filter..." maxlength="100" />
+                                    <div id="group_fav_filter" class="menu_button fa-solid fa-ranking-star" title="Show only favorites"></div>
+                                </div>
+                                <div id="rm_group_add_members" class="overflowYAuto flex-container"></div>
+                            </div>
+                        </div>
                     </div>
-                    <div id="rm_group_add_members_header">
-                        <h3>Add Members</h3>
-                        <input id="rm_group_filter" class="text_pole" type="search" placeholder="Filter..." maxlength="100" />
-                        <div id="group_fav_filter" class="menu_button fa-solid fa-ranking-star" title="Show only favorites"></div>
-                    </div>
-                    <div class="flex-container flexFlowColumn flexNoGap overflowYAuto wide100p flexGrow">
-                        <div id="rm_group_add_members"></div>
-                        <h3>Current Members</h3>
-                        <div id="rm_group_members"></div>
+                    <div class="inline-drawer wide100p flexFlowColumn">
+                        <div id="groupCurrentMemberListToggle" class="inline-drawer-toggle inline-drawer-header">
+                            Current Members
+                            <div class="fa-solid fa-circle-chevron-down inline-drawer-icon down"></div>
+                        </div>
+                        <div class="inline-drawer-content">
+                            <div name="Current Group Members" class="flex-container flexFlowColumn overflowYAuto flex1">
+                                <div id="rm_group_members" class="overflowYAuto flex-container"></div>
+                            </div>
+                        </div>
                     </div>
                 </div>
+
+
                 <div id="rm_character_import" class="right_menu" style="display: none;">
                     <form id="form_import" action="javascript:void(null);" method="post" enctype="multipart/form-data">
                         <input multiple type="file" id="character_import_file" accept=".json, image/png, image/webp" name="avatar">
                         <input id="character_import_file_type" name="file_type" class="text_pole" maxlength="999" size="2" value="" autocomplete="off">
                     </form>
                 </div>
-                <div id="rm_characters_block" class="right_menu">
+
+                <div name="Character List Panel" id="rm_characters_block" class="right_menu">
                     <div id="charListFixedTop">
-                        <div class="form_create_bottom_buttons_block">
+                        <form id="form_character_search_form" action="javascript:void(null);">
                             <div id="rm_button_create" title="Create New Character" class="menu_button fa-solid fa-user-plus "></div>
                             <div id="character_import_button" title="Import Character from File" class="menu_button fa-solid fa-file-arrow-up "></div>
-                            <div class="tags_view menu_button fa-solid fa-tags" title="Manage Tags"></div>
                             <div id="rm_button_group_chats" title="Create New Chat Group" class="menu_button fa-solid fa-users-gear "></div>
-                        </div>
-                        <form id="form_character_search_form" action="javascript:void(null);">
-                            <input id="character_search_bar" class="text_pole" type="search" placeholder="Character search..." maxlength="50" />
-                            <div id="filter_by_fav" title="Filter By Favorite" class="menu_button fa-solid fa-star"></div>
+                            <input id="character_search_bar" class="text_pole" type="search" placeholder="Search..." maxlength="50" />
                             <select id="character_sort_order" title="Characters sorting order">
-                                <option data-field="name" data-order="asc">Name, A-Z</option>
-                                <option data-field="name" data-order="desc">Name, Z-A</option>
-                                <option data-field="date_added" data-order="desc">Date added, newer first</option>
-                                <option data-field="date_added" data-order="asc">Date added, older first</option>
-                                <option data-field="fav" data-order="desc" data-rule="boolean">Favorites first</option>
-                                <option data-field="date_last_chat" data-order="desc">Recently chatted</option>
-                                <option data-field="chat_size" data-order="desc">Most chatted</option>
-                                <option data-field="chat_size" data-order="asc">Least chatted</option>
+                                <option data-field="name" data-order="asc">A-Z</option>
+                                <option data-field="name" data-order="desc">Z-A</option>
+                                <option data-field="date_added" data-order="desc">Newest</option>
+                                <option data-field="date_added" data-order="asc">Oldest</option>
+                                <option data-field="fav" data-order="desc" data-rule="boolean">Favorites</option>
+                                <option data-field="date_last_chat" data-order="desc">Recent</option>
+                                <option data-field="chat_size" data-order="desc">Most chats</option>
+                                <option data-field="chat_size" data-order="asc">Least chats</option>
                             </select>
                         </form>
-                        <div id="rm_tag_filter" class="tags"></div>
+                        <div class="rm_tag_controls">
+                            <div id="rm_tag_filter" class="tags"></div>
+                        </div>
                     </div>
                     <div id="rm_print_characters_block"></div>
                 </div>
@@ -1956,6 +2079,21 @@
 
     <!-- templates for JS to reuse when needed -->
 
+    <div id="group_scenario_template" class="template_element">
+        <div class="group_scenario range-block flexFlowColumn flex-container">
+            <div class="range-block-title title_restorable">
+                <h3>Group Chat Scenario Override</h3>
+                <div title="Remove" class="menu_button fa-solid fa-trash-can remove_scenario_override"></div>
+            </div>
+            <div class="range-block-counter justifyLeft flex-container flexFlowColumn">
+                All group members will use the following scenario text instead of what is specified in their character cards.
+            </div>
+            <div class="range-block-range wide100p">
+                <textarea class="wide100p group_chat_scenario" class="text_pole" rows="5" placeholder="Type here..."></textarea>
+            </div>
+        </div>
+    </div>
+
     <div id="past_chat_template" class="template_element">
         <div class="select_chat_block_wrapper">
             <div class="select_chat_block" file_name="">
@@ -1998,16 +2136,16 @@
                             <div class="world_entry_form_control">
                                 <label for="key">
                                     <h4>Keywords</h4>
-                                    <h5>Seperate by commas</h5>
+                                    <h5>Separate with commas</h5>
                                 </label>
-                                <textarea class="text_pole" name="key" rows="1" placeholder="" maxlength="250"></textarea>
+                                <textarea class="text_pole keyprimarytextpole" name="key" rows="1" placeholder="" maxlength="250"></textarea>
                             </div>
                             <div class="world_entry_form_control keysecondary">
                                 <label for="keysecondary">
                                     <h4>Secondary Required Keywords</h4>
-                                    <h5>Separate by commas</h5>
+                                    <h5>Separate with commas</h5>
                                 </label>
-                                <textarea class="text_pole" name="keysecondary" rows="1" placeholder="" maxlength="250"></textarea>
+                                <textarea class="text_pole keysecondarytextpole" name="keysecondary" rows="1" placeholder="(secondary keywords here)" maxlength="250"></textarea>
                             </div>
                         </div>
                         <div class="fa-solid fa-circle-chevron-down inline-drawer-icon down"></div>
@@ -2138,9 +2276,7 @@
                 <div class="ch_name">
                     <span class="name_text">${characterName}</span>
 
-                    <div title="Stop Streaming" class="mes_stop">
-                        <i class="fa-xl fa-solid fa-circle-stop"></i>
-                    </div>
+
                     <div title="Edit" class="mes_edit fa-solid fa-pencil "></div>
                     <div class="mes_edit_buttons">
                         <div class="mes_edit_done menu_button  fa-solid fa-check" title="Confirm"></div>
@@ -2152,6 +2288,9 @@
                     </div>
                 </div>
                 <div class=mes_text></div>
+                <div title="Stop Streaming" class="mes_stop">
+                    <i class="fa-xl fa-solid fa-circle-stop"></i>
+                </div>
                 <div class="mes_bias"></div>
             </div>
 
@@ -2211,6 +2350,12 @@
                 <input class="ch_fav" value="" hidden />
                 <div class="tags tags_inline"></div>
             </div>
+        </div>
+    </div>
+
+    <div id="hotswap_template" class="template_element">
+        <div class="hotswapAvatar">
+            <img src="/img/ai4.png">
         </div>
     </div>
 
