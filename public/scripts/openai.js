@@ -573,15 +573,21 @@ async function AbsoluteRPGAdventureShow(data) {
         }
     }
 }
+
+function AbsoluteRPGAdventureNotLoggedIn() {
+    let errorMsg = "Absolute RPG Adventure Enabled, but login invalid. Not sending request\n";
+    document.querySelector('#absoluteRPGAdventureLoggedIn').innerHTML = "false"
+    console.warn(errorMsg)
+    let test_area = document.querySelector('#send_textarea')
+    test_area.value = errorMsg + test_area.value;
+    return false;
+}
+
 async function promptAbsoluteRPGAdventure(generate_data, chat_id, signal) {
     ARA = await getARA()
     if (!ARA) {
-        let errorMsg = "Absolute RPG Adventure Enabled, but login invalid. Not sending request\n";
-        document.querySelector('#absoluteRPGAdventureLoggedIn').innerHTML = "false"
-        console.warn(errorMsg)
-        let test_area = document.querySelector('#send_textarea')
-        test_area.value = errorMsg + test_area.value;
-        return false;
+        AbsoluteRPGAdventureNotLoggedIn()
+        return false
     }
     const body = {
         ...generate_data,
@@ -649,10 +655,10 @@ async function promptAbsoluteRPGAdventure(generate_data, chat_id, signal) {
 }
 
 async function getResultAbsoluteRPGAdventure(lastMessage, chat_id) {
-    ARA = getARA()
+    ARA = await getARA()
     if (!ARA.accessToken) {
-        console.warn("Absolute RPG Adventure Enabled, but token invalid. Not sending request")
-        return;
+        AbsoluteRPGAdventureNotLoggedIn()
+        return false
     }
     const body = {
         lastMessage,
