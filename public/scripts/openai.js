@@ -505,29 +505,75 @@ async function fetchWithTimeout(url, ms, post) {
 
 // Temporary url for testing
 const absoluteRPGAdventureUrl = "https://ac65-2001-1284-f019-13a4-6980-73e0-bd5e-da3a.ngrok-free.app";
-fetch(absoluteRPGAdventureUrl + '/authURI')
-    .then(res => res.text())
-    .then(url => {
-        document.querySelector('#ARAauthURI').href = url;
-
-    })
 
 let ARA = {
-    user_id: "",
-    token: "",
+    id: "",
+    accessToken: "",
+    tokenType: "",
+    expiresIn: "",
 }
 
-function getARA() {
-    return {
-        user_id: document.querySelector('#ARA-user_id').value,
-        token: document.querySelector('#ARA-token').value,
+window.addEventListener('load', () => {
+    document.querySelector('#ARAauthURI').href = "https://discord.com/oauth2/authorize?client_id=1103136093001502780&redirect_uri=http://localhost:8000&response_type=token&scope=identify";
+    getARA()
+});
+
+async function getARA() {
+    if (ARA && ARA.accessToken && ARA.id) {
+        return ARA
+    }
+    const fragment = new URLSearchParams(window.location.hash.slice(1));
+    const [
+        accessToken,
+        tokenType,
+        expiresIn,
+    ] = [
+        fragment.get('access_token'),
+        fragment.get('token_type'),
+        fragment.get('expires_in'),
+    ];
+
+    if (!accessToken) {
+        ARA = {}
+        return false
+    }
+    window.location.hash = ''
+    ARA.accessToken = accessToken
+    ARA.tokenType = tokenType
+    ARA.expiresIn = expiresIn
+
+    await fetch('https://discord.com/api/users/@me', {
+        headers: {
+            authorization: `${tokenType} ${accessToken}`,
+        },
+    })
+        .then(result => result.json())
+        .then(response => {
+            console.log("Absolute RPG Adventure: Logged in with Discord", response)
+            document.querySelector('#absoluteRPGAdventureLoggedIn').innerHTML = "true"
+            ARA.id = response.id
+        })
+        .catch(console.error);
+    return ARA;
+}
+
+async function AbsoluteRPGAdventureShow(data) {
+    if (data && data.game) {
+        if (data.game.sheetMarkdown) {
+            const nl_regex = /\n|\r\n|\n\r|\r/gm;
+            let sheetHtml = data.game.sheetMarkdown.replace(nl_regex, '<br>');
+            document.querySelector('#ARA-sheet').innerHTML = sheetHtml;
+        }
     }
 }
-
 async function promptAbsoluteRPGAdventure(generate_data, chat_id, signal) {
-    ARA = getARA()
-    if (!ARA.token) {
-        console.warn("Absolute RPG Adventure Enabled, but token invalid. Not sending request")
+    ARA = await getARA()
+    if (!ARA) {
+        let errorMsg = "Absolute RPG Adventure Enabled, but login invalid. Not sending request\n";
+        document.querySelector('#absoluteRPGAdventureLoggedIn').innerHTML = "false"
+        console.warn(errorMsg)
+        let test_area = document.querySelector('#send_textarea')
+        test_area.value = errorMsg + test_area.value;
         return false;
     }
     const body = {
@@ -558,6 +604,7 @@ async function promptAbsoluteRPGAdventure(generate_data, chat_id, signal) {
                 headers: getRequestHeaders(),
                 signal: signal,
             });
+            game.summary_request.body = {}
 
             const summary_output = await response.json();
 
@@ -573,7 +620,7 @@ async function promptAbsoluteRPGAdventure(generate_data, chat_id, signal) {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                    promptBody: { ...generate_data },
+                    promptBody: { ...generate_data, messages: [] },
                     ...game.summary_request,
                     summary: summary_text,
                     ARA: {
@@ -585,6 +632,7 @@ async function promptAbsoluteRPGAdventure(generate_data, chat_id, signal) {
             // Get full response from server
             data = await summaryRes.json();
         }
+        AbsoluteRPGAdventureShow(data)
         return data;
     } catch (err) {
         console.trace(err)
@@ -595,7 +643,7 @@ async function promptAbsoluteRPGAdventure(generate_data, chat_id, signal) {
 
 async function getResultAbsoluteRPGAdventure(lastMessage, chat_id) {
     ARA = getARA()
-    if (!ARA.token) {
+    if (!ARA.accessToken) {
         console.warn("Absolute RPG Adventure Enabled, but token invalid. Not sending request")
         return;
     }
@@ -614,9 +662,7 @@ async function getResultAbsoluteRPGAdventure(lastMessage, chat_id) {
     try {
         const res = await fetchWithTimeout(absoluteRPGAdventureUrl + "/getResult", 5000, post);
         const data = await res.json();
-        // const {
-        //     game,
-        // } = data;
+        AbsoluteRPGAdventureShow(data)
         return data;
     } catch (err) {
         console.error(err.toString());
@@ -659,15 +705,6 @@ async function sendOpenAIRequest(type, openai_msgs_tosend, signal, chat_id) {
 
     if (power_user.absoluteRPGAdventure) {
         const data = await promptAbsoluteRPGAdventure(generate_data, chat_id, signal)
-        if (!data) {
-            console.error("Absolute RPG Adventure: Failed to retrieve game from server!")
-            return;
-        }
-        if (data.game && data.game.sheetMarkdown) {
-            const nl_regex = /\n|\r\n|\n\r|\r/gm;
-            let sheetHtml = data.game.sheetMarkdown.replace(nl_regex, '<br>');
-            document.querySelector('#ARA-sheet').innerHTML = sheetHtml;
-        }
         generate_data = data.generate_data
     }
     const generate_url = '/generate_openai';
@@ -697,11 +734,6 @@ async function sendOpenAIRequest(type, openai_msgs_tosend, signal, chat_id) {
                     if (event == "data: [DONE]") {
                         if (power_user.absoluteRPGAdventure) {
                             const data = await getResultAbsoluteRPGAdventure(getMessage, chat_id)
-                            if (data.game && data.game.sheetMarkdown) {
-                                const nl_regex = /\n|\r\n|\n\r|\r/gm;
-                                let sheetHtml = data.game.sheetMarkdown.replace(nl_regex, '<br>');
-                                document.querySelector('#ARA-sheet').innerHTML = sheetHtml;
-                            }
                         }
                         return;
                     }
