@@ -3,7 +3,7 @@ import { getContext, getApiUrl, modules, extension_settings } from "../../extens
 export { MODULE_NAME };
 
 const MODULE_NAME = 'expressions';
-const UPDATE_INTERVAL = 1000;
+const UPDATE_INTERVAL = 2000;
 const DEFAULT_EXPRESSIONS = [
     "admiration",
     "amusement",
@@ -381,4 +381,5 @@ function onClickExpressionImage() {
     addExpressionImage();
     addSettings();
     setInterval(moduleWorkerWrapper, UPDATE_INTERVAL);
+    moduleWorkerWrapper();
 })();

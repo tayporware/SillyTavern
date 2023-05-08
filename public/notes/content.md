@@ -109,7 +109,7 @@ For example:
 
 ### Examples of dialogue
 
-Describes how the character speaks. Before each example, you need to add the <START> tag.
+Describes how the character speaks. Before each example, you need to add the &lt;START&gt; tag.
 Use {{char}} instead of the character name.
 Use {{user}} instead of the user name.
 
@@ -135,8 +135,8 @@ Circumstances and context of the dialogue.
 
 _A list of tags that are replaced when sending to generate:_
 
-1. {{user}} and <USER> are replaced by the User's Name  
-2. {{char}} and <BOT> are replaced by the Character's Name
+1. {{user}} and &lt;USER&gt; are replaced by the User's Name  
+2. {{char}} and &lt;BOT&gt; are replaced by the Character's Name
 
 ### Favorite Character
 
@@ -212,6 +212,26 @@ If the budget was exhausted, then no more entries are activated even if the keys
 Constant entries will be inserted first. Then entries with higher order numbers.
 
 Entries inserted by direct mentioning of their keys have higher priority than those that were mentioned in other entries contents.
+
+### Recursive scanning
+
+**Entries can activate other entries by mentioning their keywords in the content text.**
+
+For example, if your World Info contains two entries: 
+
+```
+Entry #1
+Keyword: Bessie
+Content: Bessie is a cow and is friend with Rufus.
+```
+
+```
+Entry #2
+Keyword: Rufus
+Content: Rufus is a dog.
+```
+
+**Both** of them will be pulled into the context if the message text mentions **just Bessie**.
 
 ## KoboldAI
 
@@ -402,6 +422,8 @@ To import Character.AI chats, use this tool: [https://github.com/0x000011b/chara
 
 ## Tokenizer
 
+**Important: This section doesn't apply to OpenAI API. SillyTavern will always use a matching tokenizer for OpenAI models.**
+
 A tokenizer is a tool that breaks down a piece of text into smaller units called tokens. These tokens can be individual words or even parts of words, such as prefixes, suffixes, or punctuation. A rule of thumb is that one token generally corresponds to 3~4 characters of text. 
 
 SillyTavern can use the following tokenizers while forming a request to the AI backend:
@@ -410,6 +432,18 @@ SillyTavern can use the following tokenizers while forming a request to the AI b
 2. GPT-3 tokenizer. **Use to get more accurate counts on OpenAI character cards.** Can be previewed here: [OpenAI Tokenizer](https://platform.openai.com/tokenizer).
 3. (Legacy) GPT-2/3 tokenizer. Used by original TavernAI. **Pick this if you're unsure.** More info: [gpt-2-3-tokenizer](https://github.com/josephrocca/gpt-2-3-tokenizer).
 4. Sentencepiece tokenizer. Used by LLaMA model family: Alpaca, Vicuna, Koala, etc. **Pick if you use a LLaMA model.**
+
+## Token Padding
+
+**Important: This section doesn't apply to OpenAI API. SillyTavern will always use a matching tokenizer for OpenAI models.**
+
+SillyTavern cannot use a proper tokenizer provided by the model running on a remote instance of KoboldAI or Oobabooga's TextGen, so all token counts assumed during prompt generation are estimated based on the selected [tokenizer](#Tokenizer) type.
+
+Since the results of tokenization can be inaccurate on context sizes close to the model-defined maximum, some parts of the prompt may be trimmed or dropped, which may negatively affect the coherence of character definitions.
+
+To prevent this, SillyTavern allocates a portion of the context size as padding to avoid adding more chat items than the model can accommodate. If you find that some part of the prompt is trimmed even with the most-matching tokenizer selected, adjust the padding so the description is not truncated.
+
+You can input negative values for reverse padding, which allows allocating more than the set maximum amount of tokens.
 
 ## Advanced Formatting
 
@@ -528,7 +562,7 @@ Next batches = 30 tokens
 
 1. Generated enough text.
 2. Character starts speaking for You.
-3. <|endoftext|> token reached.
+3. &lt;|endoftext|&gt; token reached.
 4. No text generated.
 
 ## User Settings 
