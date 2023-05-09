@@ -1856,9 +1856,6 @@ async function Generate(type, { automatic_trigger, force_name2, resolve, reject,
                 if (canFitMessages()) {
                     count_exm_add++;
                 } else {
-                    // doesn't fit, so remove
-                    examplesString.slice(examplesString.length - example.length,)
-                    count_exm_add--;
                     break;
                 }
                 await delay(1);
