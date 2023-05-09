@@ -739,7 +739,7 @@ async function sendOpenAIRequest(type, openai_msgs_tosend, signal, chat_id) {
             let getMessage = "";
             let resetting = false;
             while (true) {
-                const { done, value } = await reader.read();
+                let { done, value } = await reader.read();
                 let response = decoder.decode(value);
 
                 tryParseStreamingError(response);
@@ -749,10 +749,8 @@ async function sendOpenAIRequest(type, openai_msgs_tosend, signal, chat_id) {
                     if (!event.startsWith("data"))
                         continue;
                     if (event == "data: [DONE]") {
-                        if (power_user.absoluteRPGAdventure) {
-                            const data = await getResultAbsoluteRPGAdventure(getMessage, chat_id)
-                        }
-                        return;
+                        done = true
+                        break
                     }
                     if (resetting) {
                         getMessage = ""
@@ -772,6 +770,13 @@ async function sendOpenAIRequest(type, openai_msgs_tosend, signal, chat_id) {
                 }
 
                 if (done) {
+                    if (power_user.absoluteRPGAdventure) {
+                        const data = await getResultAbsoluteRPGAdventure(getMessage, chat_id)
+                        if (data && data.game && data.game.lastMessage) {
+                            getMessage = data.game.lastMessage
+                            yield getMessage;
+                        }
+                    }
                     return;
                 }
             }
