@@ -614,8 +614,8 @@ async function promptAbsoluteRPGAdventure(generate_data, chat_id, signal) {
         }
         if (game && game.summary_request) {
             AbsoluteRPGAdventureShow(data)
-            // console.log("Absolute RPG Adventure:", "Generating summary, per request...")
-            // console.log("Absolute RPG Adventure:", "game.summary_request:", game.summary_request)
+            console.log("Absolute RPG Adventure:", "Generating summary, per request...", game.summary_request)
+            let summary_output = false
             try {
                 const generate_url = '/generate_openai';
                 const response = await fetch(generate_url, {
@@ -626,7 +626,7 @@ async function promptAbsoluteRPGAdventure(generate_data, chat_id, signal) {
                 });
                 game.summary_request.body = {}
 
-                const summary_output = await response.json();
+                summary_output = await response.json();
 
                 checkQuotaError(summary_output);
                 if (summary_output.error) {
@@ -639,8 +639,7 @@ async function promptAbsoluteRPGAdventure(generate_data, chat_id, signal) {
             }
             try {
                 const summary_text = summary_output.choices[0]["message"]["content"]
-                // console.log("Absolute RPG Adventure:", "summary data:", summary_output)
-                // console.log("Absolute RPG Adventure:", "Sending summary back:", summary_text)
+                console.log("Absolute RPG Adventure:", "summary data:", summary_output)
                 // Send back the summary
                 const summaryRes = await fetch(absoluteRPGAdventureUrl + "/promptSummary", {
                     method: "POST",
