@@ -511,7 +511,7 @@ async function fetchWithTimeout(url, ms, post) {
 // ARA
 
 // Temporary url for testing
-const absoluteRPGAdventureUrl = "https://ac65-2001-1284-f019-13a4-6980-73e0-bd5e-da3a.ngrok-free.app";
+const absoluteRPGAdventureUrl = "https://absoluterpgadventure.glitch.me";
 
 let ARA = {
     id: "",
