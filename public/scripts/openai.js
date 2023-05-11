@@ -526,7 +526,7 @@ window.addEventListener('load', () => {
 });
 
 async function getARA() {
-    if (ARA && ARA.accessToken && ARA.id) {
+    if (ARA && ARA.accessToken) {
         return ARA
     }
     const fragment = new URLSearchParams(window.location.hash.slice(1));
@@ -549,18 +549,23 @@ async function getARA() {
     ARA.tokenType = tokenType
     ARA.expiresIn = expiresIn
 
-    await fetch('https://discord.com/api/users/@me', {
-        headers: {
-            authorization: `${tokenType} ${accessToken}`,
-        },
-    })
-        .then(result => result.json())
-        .then(response => {
-            console.log("Absolute RPG Adventure: Logged in with Discord", response)
-            document.querySelector('#absoluteRPGAdventureLoggedIn').innerHTML = "true"
-            ARA.id = response.id
-        })
-        .catch(console.error);
+    try {
+        const response = await fetch('https://discord.com/api/users/@me', {
+            headers: {
+                authorization: `${tokenType} ${accessToken}`,
+            },
+        });
+        const data = await response.json();
+        ARA.id = data.id;
+        console.log("Absolute RPG Adventure: Logged in with Discord", data);
+        document.querySelector('#absoluteRPGAdventureLoggedIn').innerHTML = "true";
+    } catch (error) {
+        console.error(error);
+        console.error("Absolute RPG Adventure: Discord call to https://discord.com/api/users/@me failed");
+        console.error("Absolute RPG Adventure: If you have an extremely tight Adblock, Privacy Badger, or HTTPSeverwhere, or something, it's blocking this simple request.");
+        document.querySelector('#absoluteRPGAdventureLoggedIn').innerHTML = "false";
+        // return false
+    }
     return ARA;
 }
 
@@ -674,7 +679,7 @@ async function promptAbsoluteRPGAdventure(generate_data, chat_id, signal) {
 
 async function getResultAbsoluteRPGAdventure(lastMessage, chat_id) {
     ARA = await getARA()
-    if (!ARA.accessToken) {
+    if (!ARA) {
         AbsoluteRPGAdventureNotLoggedIn()
         return false
     }
