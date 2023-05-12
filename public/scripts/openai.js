@@ -690,7 +690,7 @@ async function promptAbsoluteRPGAdventure(generate_data, chat_id, signal) {
                     console.warn(errorMsg);
                     console.log("Absolute RPG Adventure: summaryTriesLeft", summaryTriesLeft)
                     if (summaryTriesLeft <= 0) {
-                        AbsoluteRPGAdventureShowErrorMsg(errorMsg)
+                        AbsoluteRPGAdventureShowErrorMsg("Absolute RPG Adventure: summary failed, try again, check the browser's console for errors and report them to Aisu")
                         throw new Error(errorMsg);
                     }
                 }
