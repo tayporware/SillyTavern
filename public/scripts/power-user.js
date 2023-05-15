@@ -76,6 +76,8 @@ let power_user = {
     disable_personality_formatting: false,
     disable_examples_formatting: false,
     disable_start_formatting: false,
+    trim_sentences: false,
+    include_newline: false,
     always_force_name2: false,
     multigen: false,
     multigen_first_chunk: 50,
@@ -114,6 +116,7 @@ let power_user = {
     auto_scroll_chat_to_bottom: true,
     auto_fix_generated_markdown: true,
     send_on_enter: send_on_enter_options.AUTO,
+    console_log_prompts: false,
     render_formulas: false,
 
     allow_name1_display: false,
@@ -490,6 +493,7 @@ function loadPowerUserSettings(settings, data) {
     $('#auto_swipe_blacklist').val(power_user.auto_swipe_blacklist.join(", "));
     $('#auto_swipe_blacklist_threshold').val(power_user.auto_swipe_blacklist_threshold);
 
+    $("#console_log_prompts").prop("checked", power_user.console_log_prompts);
     $('#auto_fix_generated_markdown').prop("checked", power_user.auto_fix_generated_markdown);
     $('#auto_scroll_chat_to_bottom').prop("checked", power_user.auto_scroll_chat_to_bottom);
     $(`#tokenizer option[value="${power_user.tokenizer}"]`).attr('selected', true);
@@ -503,6 +507,8 @@ function loadPowerUserSettings(settings, data) {
     $("#always-force-name2-checkbox").prop("checked", power_user.always_force_name2);
     $("#disable-examples-formatting-checkbox").prop("checked", power_user.disable_examples_formatting);
     $('#disable-start-formatting-checkbox').prop("checked", power_user.disable_start_formatting);
+    $("#trim_sentences_checkbox").prop("checked", power_user.trim_sentences);
+    $("#include_newline_checkbox").prop("checked", power_user.include_newline);
     $('#render_formulas').prop("checked", power_user.render_formulas);
     $("#custom_chat_separator").val(power_user.custom_chat_separator);
     $("#fast_ui_mode").prop("checked", power_user.fast_ui_mode);
@@ -560,7 +566,7 @@ function loadPowerUserSettings(settings, data) {
 
 function loadMaxContextUnlocked() {
     $('#max_context_unlocked').prop('checked', power_user.max_context_unlocked);
-    $('#max_context_unlocked').on('change', function() {
+    $('#max_context_unlocked').on('change', function () {
         power_user.max_context_unlocked = !!$(this).prop('checked');
         switchMaxContextSize();
         saveSettingsDebounced();
@@ -786,18 +792,21 @@ function resetMovablePanels() {
     document.getElementById("sheld").style.right = '';
     document.getElementById("sheld").style.height = '';
     document.getElementById("sheld").style.width = '';
+    document.getElementById("sheld").style.margin = '';
 
 
     document.getElementById("left-nav-panel").style.top = '';
     document.getElementById("left-nav-panel").style.left = '';
     document.getElementById("left-nav-panel").style.height = '';
     document.getElementById("left-nav-panel").style.width = '';
+    document.getElementById("left-nav-panel").style.margin = '';
 
     document.getElementById("right-nav-panel").style.top = '';
     document.getElementById("right-nav-panel").style.left = '';
     document.getElementById("right-nav-panel").style.right = '';
     document.getElementById("right-nav-panel").style.height = '';
     document.getElementById("right-nav-panel").style.width = '';
+    document.getElementById("right-nav-panel").style.margin = '';
 
     document.getElementById("expression-holder").style.top = '';
     document.getElementById("expression-holder").style.left = '';
@@ -805,6 +814,7 @@ function resetMovablePanels() {
     document.getElementById("expression-holder").style.bottom = '';
     document.getElementById("expression-holder").style.height = '';
     document.getElementById("expression-holder").style.width = '';
+    document.getElementById("expression-holder").style.margin = '';
 
     document.getElementById("avatar_zoom_popup").style.top = '';
     document.getElementById("avatar_zoom_popup").style.left = '';
@@ -812,6 +822,15 @@ function resetMovablePanels() {
     document.getElementById("avatar_zoom_popup").style.bottom = '';
     document.getElementById("avatar_zoom_popup").style.height = '';
     document.getElementById("avatar_zoom_popup").style.width = '';
+    document.getElementById("avatar_zoom_popup").style.margin = '';
+
+    document.getElementById("WorldInfo").style.top = '';
+    document.getElementById("WorldInfo").style.left = '';
+    document.getElementById("WorldInfo").style.right = '';
+    document.getElementById("WorldInfo").style.bottom = '';
+    document.getElementById("WorldInfo").style.height = '';
+    document.getElementById("WorldInfo").style.width = '';
+    document.getElementById("WorldInfo").style.margin = '';
 }
 
 $(document).ready(() => {
@@ -854,6 +873,27 @@ $(document).ready(() => {
 
     $("#disable-start-formatting-checkbox").change(function () {
         power_user.disable_start_formatting = !!$(this).prop('checked');
+        saveSettingsDebounced();
+    });
+
+    // include newline is the child of trim sentences
+    // if include newline is checked, trim sentences must be checked
+    // if trim sentences is unchecked, include newline must be unchecked
+    $("#trim_sentences_checkbox").change(function() {
+        power_user.trim_sentences = !!$(this).prop("checked");
+        if (!$(this).prop("checked")) {
+            $("#include_newline_checkbox").prop("checked", false);
+            power_user.include_newline = false;
+        }
+        saveSettingsDebounced();
+    });
+
+    $("#include_newline_checkbox").change(function() {
+        power_user.include_newline = !!$(this).prop("checked");
+        if ($(this).prop("checked")) {
+            $("#trim_sentences_checkbox").prop("checked", true);
+            power_user.trim_sentences = true;
+        }
         saveSettingsDebounced();
     });
 
@@ -1020,7 +1060,6 @@ $(document).ready(() => {
 
     $('#auto_swipe').on('input', function () {
         power_user.auto_swipe = !!$(this).prop('checked');
-        console.log("power_user.auto_swipe", power_user.auto_swipe)
         saveSettingsDebounced();
     });
 
@@ -1037,7 +1076,6 @@ $(document).ready(() => {
         const number = parseInt($(this).val());
         if (!isNaN(number)) {
             power_user.auto_swipe_minimum_length = number;
-            console.log("power_user.auto_swipe_minimum_length", power_user.auto_swipe_minimum_length)
             saveSettingsDebounced();
         }
     });
@@ -1046,7 +1084,6 @@ $(document).ready(() => {
         const number = parseInt($(this).val());
         if (!isNaN(number)) {
             power_user.auto_swipe_blacklist_threshold = number;
-            console.log("power_user.auto_swipe_blacklist_threshold", power_user.auto_swipe_blacklist_threshold)
             saveSettingsDebounced();
         }
     });
@@ -1054,6 +1091,11 @@ $(document).ready(() => {
     $('#auto_fix_generated_markdown').on('input', function () {
         power_user.auto_fix_generated_markdown = !!$(this).prop('checked');
         reloadCurrentChat();
+        saveSettingsDebounced();
+    });
+
+    $("#console_log_prompts").on('input', function () {
+        power_user.console_log_prompts = !!$(this).prop('checked');
         saveSettingsDebounced();
     });
 

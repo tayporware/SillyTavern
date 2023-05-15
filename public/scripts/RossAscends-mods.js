@@ -30,12 +30,17 @@ import {
 import { sortByCssOrder } from "./utils.js";
 
 var NavToggle = document.getElementById("nav-toggle");
+
 var RPanelPin = document.getElementById("rm_button_panel_pin");
 var LPanelPin = document.getElementById("lm_button_panel_pin");
-var ARAPin = document.getElementById("ARA_button_panel_pin");
-var SelectedCharacterTab = document.getElementById("rm_button_selected_ch");
+var WIPanelPin = document.getElementById("WI_panel_pin");
+
 var RightNavPanel = document.getElementById("right-nav-panel");
-var LeftNavPanel = document.getElementById("left-nav-panel")
+var LeftNavPanel = document.getElementById("left-nav-panel");
+var WorldInfo = document.getElementById("WorldInfo");
+
+var SelectedCharacterTab = document.getElementById("rm_button_selected_ch");
+var ARAPin = document.getElementById("ARA_button_panel_pin");
 var ARAPanel = document.getElementById("ara-panel")
 var AdvancedCharDefsPopup = document.getElementById("character_popup");
 var ConfirmationPopup = document.getElementById("dialogue_popup");
@@ -414,23 +419,18 @@ function OpenNavPanels() {
     if (LoadLocalBool("NavLockOn") == true && LoadLocalBool("NavOpened") == true) {
         //console.log("RA -- clicking right nav to open");
         $("#rightNavDrawerIcon").click();
-    } else {
-        /*         console.log('didnt see reason to open right nav on load: R-nav locked? ' +
-                    LoadLocalBool("NavLockOn")
-                    + ' R-nav was open before? ' +
-                    LoadLocalBool("NavOpened" == true)); */
     }
 
     //auto-open L nav if locked and previously open
-
     if (LoadLocalBool("LNavLockOn") == true && LoadLocalBool("LNavOpened") == true) {
         console.log("RA -- clicking left nav to open");
         $("#leftNavDrawerIcon").click();
-    } else {
-        /*         console.log('didnt see reason to open left nav on load: L-Nav Locked? ' +
-                    LoadLocalBool("LNavLockOn")
-                    + ' L-nav was open before? ' +
-                    LoadLocalBool("LNavOpened" == true)); */
+    }
+
+    //auto-open WI if locked and previously open
+    if (LoadLocalBool("WINavLockOn") == true && LoadLocalBool("WINavOpened") == true) {
+        console.log("RA -- clicking WI to open");
+        $("#WIDrawerIcon").click();
     }
 }
 
@@ -440,6 +440,7 @@ dragElement(document.getElementById("sheld"));
 dragElement(document.getElementById("left-nav-panel"));
 dragElement(document.getElementById("right-nav-panel"));
 dragElement(document.getElementById("avatar_zoom_popup"));
+dragElement(document.getElementById("WorldInfo"));
 
 
 
@@ -548,6 +549,7 @@ function dragElement(elmnt) {
             elmnt.style.top = (elmnt.offsetTop - pos2) + "px";
             $(elmnt).css("bottom", "unset");
             $(elmnt).css("right", "unset");
+            $(elmnt).css("margin", "unset");
 
             /*             console.log(`
                                         offsetLeft: ${elmnt.offsetLeft}, offsetTop: ${elmnt.offsetTop}
@@ -616,7 +618,7 @@ $("document").ready(function () {
 
             if ($(RightNavPanel).hasClass('openDrawer') && $('.openDrawer').length > 1) {
                 $(RightNavPanel).slideToggle(200, "swing");
-                $(rightNavDrawerIcon).toggleClass('openIcon closedIcon');
+                //$(rightNavDrawerIcon).toggleClass('openIcon closedIcon');
                 $(RightNavPanel).toggleClass('openDrawer closedDrawer');
             }
         }
@@ -632,11 +634,30 @@ $("document").ready(function () {
 
             if ($(LeftNavPanel).hasClass('openDrawer') && $('.openDrawer').length > 1) {
                 $(LeftNavPanel).slideToggle(200, "swing");
-                $(leftNavDrawerIcon).toggleClass('openIcon closedIcon');
+                //$(leftNavDrawerIcon).toggleClass('openIcon closedIcon');
                 $(LeftNavPanel).toggleClass('openDrawer closedDrawer');
             }
         }
     });
+
+    $(WIPanelPin).on("click", function () {
+        SaveLocal("WINavLockOn", $(WIPanelPin).prop("checked"));
+        if ($(WIPanelPin).prop("checked") == true) {
+            console.log('adding pin class to WI');
+            $(WorldInfo).addClass('pinnedOpen');
+        } else {
+            console.log('removing pin class from WI');
+            $(WorldInfo).removeClass('pinnedOpen');
+
+            if ($(WorldInfo).hasClass('openDrawer') && $('.openDrawer').length > 1) {
+                console.log('closing WI after lock removal');
+                $(WorldInfo).slideToggle(200, "swing");
+                //$(WorldInfoDrawerIcon).toggleClass('openIcon closedIcon');
+                $(WorldInfo).toggleClass('openDrawer closedDrawer');
+            }
+        }
+    });
+
     $(ARAPin).on("click", function () {
         SaveLocal("ARALockOn", $(ARAPin).prop("checked"));
         if ($(ARAPin).prop("checked") == true) {
@@ -674,15 +695,28 @@ $("document").ready(function () {
         console.log('setting pin class via checkbox state');
         $(LeftNavPanel).addClass('pinnedOpen');
     }
+
     // read the state of left Nav Lock and apply to leftnav classlist
-    $(ARAPin).prop('checked', LoadLocalBool("LNavLockOn"));
-    if (LoadLocalBool("LNavLockOn") == true) {
+    $(WIPanelPin).prop('checked', LoadLocalBool("WINavLockOn"));
+    if (LoadLocalBool("WINavLockOn") == true) {
         //console.log('setting pin class via local var');
-        $(LeftNavPanel).addClass('pinnedOpen');
+        $(WorldInfo).addClass('pinnedOpen');
+    }
+
+    if ($(WIPanelPin).prop('checked' == true)) {
+        console.log('setting pin class via checkbox state');
+        $(WorldInfo).addClass('pinnedOpen');
+    }
+
+
+    $(ARAPin).prop('checked', LoadLocalBool("ARALockOn"));
+    if (LoadLocalBool("ARALockOn") == true) {
+        //console.log('setting pin class via local var');
+        $(ARAPanel).addClass('pinnedOpen');
     }
     if ($(ARAPin).prop('checked' == true)) {
         console.log('setting pin class via checkbox state');
-        $(LeftNavPanel).addClass('pinnedOpen');
+        $(ARAPanel).addClass('pinnedOpen');
     }
 
     //save state of Right nav being open or closed
@@ -697,6 +731,13 @@ $("document").ready(function () {
         if (!$("#leftNavDrawerIcon").hasClass('openIcon')) {
             SaveLocal('LNavOpened', 'true');
         } else { SaveLocal('LNavOpened', 'false'); }
+    });
+
+    //save state of Left nav being open or closed
+    $("#WorldInfo").on("click", function () {
+        if (!$("#WorldInfo").hasClass('openIcon')) {
+            SaveLocal('WINavOpened', 'true');
+        } else { SaveLocal('WINavOpened', 'false'); }
     });
 
     //save state of ARA being open or closed
