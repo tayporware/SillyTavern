@@ -555,6 +555,8 @@ const MAX_GENERATION_LOOPS = 5;
 
 let token;
 
+var PromptArrayItemForRawPromptDisplay;
+
 export function getRequestHeaders() {
     return {
         "Content-Type": "application/json",
@@ -1403,7 +1405,12 @@ function getExtensionPrompt(position = 0, depth = undefined, separator = "\n") {
 
 function baseChatReplace(value, name1, name2) {
     if (value !== undefined && value.length > 0) {
-        value = substituteParams(value, is_pygmalion ? "You" : name1, name2);
+        if (is_pygmalion) {
+            value = value.replace(/{{user}}:/gi, 'You:');
+            value = value.replace(/<USER>:/gi, 'You:');
+        }
+
+        value = substituteParams(value, name1, name2);
 
         if (power_user.collapse_newlines) {
             value = collapseNewlines(value);
@@ -2520,6 +2527,7 @@ function promptItemize(itemizedPrompts, requestedMesId) {
     for (var i = 0; i < itemizedPrompts.length; i++) {
         if (itemizedPrompts[i].mesId === incomingMesId) {
             thisPromptSet = i;
+            PromptArrayItemForRawPromptDisplay = Number(i);
         }
     }
 
@@ -5167,6 +5175,9 @@ $(document).ready(function () {
             }
         }
 
+        rawPromptPopper.update();
+        $('#rawPromptPopup').hide();
+
         if (dialogueResolve) {
             if (popup_type == 'input') {
                 dialogueResolve($("#dialogue_popup_input").val());
@@ -5818,15 +5829,20 @@ $(document).ready(function () {
     })
 
     $(document).on("pointerup", "#showRawPrompt", function () {
-        //let mesIdForItemization = $(this).closest('.mes').attr('mesId');
-        //console.log(generate_data.prompt);
-        console.log(itemizedPrompts[0].rawPrompt);
-        $("#rawPromptWrapper").html(itemizedPrompts[0].rawPrompt.replace(/\n/g, '<br>'));
+        //console.log(itemizedPrompts[PromptArrayItemForRawPromptDisplay].rawPrompt);
+        console.log(itemizedPrompts[PromptArrayItemForRawPromptDisplay].rawPrompt);
+
+        let rawPrompt = itemizedPrompts[PromptArrayItemForRawPromptDisplay].rawPrompt;
+        let rawPromptValues = rawPrompt;
+
+        if (Array.isArray(rawPrompt)) {
+            rawPromptValues = rawPrompt.map(x => x.content).join('\n');
+        }
+
+        //let DisplayStringifiedPrompt = JSON.stringify(itemizedPrompts[PromptArrayItemForRawPromptDisplay].rawPrompt).replace(/\n+/g, '<br>');
+        $("#rawPromptWrapper").text(rawPromptValues);
         rawPromptPopper.update();
         $('#rawPromptPopup').toggle();
-
-        //Popper(itemizedPrompts, mesIdForItemization);
-
     })
 
 
