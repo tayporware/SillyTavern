@@ -779,9 +779,15 @@ async function sendOpenAIRequest(type, openai_msgs_tosend, signal, chat_id) {
 
 
     if (power_user.absoluteRPGAdventure) {
-        const data = await promptAbsoluteRPGAdventure(generate_data, chat_id, signal)
-        if (data && data.generate_data) {
-            generate_data = data.generate_data
+        try {
+            const data = await promptAbsoluteRPGAdventure(generate_data, chat_id, signal)
+            if (data && data.generate_data) {
+                generate_data = data.generate_data
+            }
+        } catch (error) {
+            const errorMsg = "Absolute RPG Adventure: Failed on promptAbsoluteRPGAdventure: " + error.stack.toString();
+            console.error(errorMsg);
+            throw new Error(errorMsg);
         }
     }
     const generate_url = '/generate_openai';
