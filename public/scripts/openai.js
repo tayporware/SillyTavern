@@ -562,6 +562,7 @@ async function getARA() {
     ARA.accessToken = accessToken
     ARA.tokenType = tokenType
     ARA.expiresIn = expiresIn
+    document.querySelector('#absoluteRPGAdventureLoggedIn').innerHTML = "true";
 
     try {
         const response = await fetch('https://discord.com/api/users/@me', {
@@ -572,12 +573,11 @@ async function getARA() {
         const data = await response.json();
         ARA.id = data.id;
         console.log("Absolute RPG Adventure: Logged in with Discord", data);
-        document.querySelector('#absoluteRPGAdventureLoggedIn').innerHTML = "true";
     } catch (error) {
         console.error(error);
         console.error("Absolute RPG Adventure: Discord call to https://discord.com/api/users/@me failed");
         console.error("Absolute RPG Adventure: If you have an extremely tight Adblock, Privacy Badger, or HTTPSeverwhere, or something, it's blocking this simple request.");
-        document.querySelector('#absoluteRPGAdventureLoggedIn').innerHTML = "false";
+        document.querySelector('#absoluteRPGAdventureLoggedIn').innerHTML = "true, but discord request blocked";
         // return false
     }
     return ARA;
