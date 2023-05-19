@@ -532,11 +532,35 @@ let ARA = {
     accessToken: "",
     tokenType: "",
     expiresIn: "",
+    regeneratingSummary: false,
 }
 
 window.addEventListener('load', () => {
     document.querySelector('#ARAauthURI').href = "https://discord.com/oauth2/authorize?client_id=1103136093001502780&redirect_uri=http://localhost:8000&response_type=token&scope=identify";
     getARA()
+    let ARA_button_summary_regenerate = document.querySelector('#ARA_button_summary_regenerate')
+    let ARA_button_summary_regenerate_text = document.querySelector('#ARA_button_summary_regenerate_text')
+    ARA_button_summary_regenerate.onclick = async () => {
+        if (!ARA.summary_request) {
+            console.warn("Absolute RPG Adventure:", "clicked on summary, but there's no latest request")
+            return;
+        }
+        if (ARA.regeneratingSummary) {
+            console.warn("Absolute RPG Adventure:", "clicked on summary, but already regenerating")
+            return;
+        }
+        ARA.regeneratingSummary = true;
+        let button_summary_regenerate_innerHTML = ARA_button_summary_regenerate_text.innerHTML;
+        try {
+            ARA_button_summary_regenerate_text.innerHTML = "Regenerating summary...";
+            let data = await updateSummary()
+            AbsoluteRPGAdventureShow(data)
+        } catch (error) {
+            console.warn("Absolute RPG Adventure:", "summary regeneration failed", error)
+        }
+        ARA.regeneratingSummary = false;
+        ARA_button_summary_regenerate_text.innerHTML = button_summary_regenerate_innerHTML;
+    }
 });
 
 async function getARA() {
@@ -606,6 +630,71 @@ function AbsoluteRPGAdventureNotLoggedIn() {
     throw new Error(errorMsg);
 }
 
+async function generateSummary(signal) {
+    const generate_url = '/generate_openai';
+    const response = await fetch(generate_url, {
+        method: 'POST',
+        body: JSON.stringify(ARA.summary_request.body),
+        headers: getRequestHeaders(),
+        signal,
+    });
+
+    let summary_output = await response.json();
+
+    checkQuotaError(summary_output);
+    if (summary_output.error) {
+        console.log("sleeping on summary_output.error =", JSON.stringify(summary_output.error))
+        await delay(2 * 1000)
+        throw new Error(JSON.stringify(summary_output));
+    }
+    return summary_output
+}
+
+async function updateSummary(signal = null) {
+    let summary_output = false;
+    try {
+        console.log("Absolute RPG Adventure:", "Generating summary", ARA.summary_request)
+        summary_output = await generateSummary(signal)
+    } catch (error) {
+        console.error(error);
+        const errorMsg = "while getting summary";
+        throw new Error(errorMsg);
+    }
+    let data = null;
+    try {
+        const summary_text = summary_output.choices[0]["message"]["content"]
+        console.log("Absolute RPG Adventure:", "summary data:", summary_output)
+        // Send back the summary
+        const summaryRes = await fetch(absoluteRPGAdventureUrl + "/promptSummary", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                generate_data: { ...ARA.summary_request.generate_data, messages: [] },
+                context_max_tokens: ARA.summary_request.context_max_tokens,
+                ...{ ...ARA.summary_request, body: {} },
+                summary: summary_text,
+                ARA: {
+                    ...ARA,
+                    chat_id: ARA.summary_request.chat_id,
+                },
+            }),
+            signal,
+        });
+        // Get full response from server
+        data = await summaryRes.json();
+        if (data.game && (data.game.summaryAgain || data.game.error)) {
+            // asking for another summary, this one failed somehow
+            console.warn("Absolute RPG Adventure:", data.game.error)
+            throw new Error(data.game.error);
+        }
+    } catch (error) {
+        console.error(error);
+        const errorMsg = "while sending summary back";
+        throw new Error(errorMsg);
+    }
+    return data
+}
+
 async function promptAbsoluteRPGAdventure(generate_data, chat_id, signal) {
     ARA = await getARA()
     if (!ARA) {
@@ -635,64 +724,16 @@ async function promptAbsoluteRPGAdventure(generate_data, chat_id, signal) {
         return data;
     }
     if (game && game.summary_request) {
+        ARA.summary_request = game.summary_request
+        ARA.summary_request.chat_id = chat_id
+        ARA.summary_request.context_max_tokens = context_max_tokens
+        ARA.summary_request.generate_data = generate_data
         AbsoluteRPGAdventureShow(data)
-        console.log("Absolute RPG Adventure:", "Generating summary, per request...", game.summary_request)
+        console.log("Absolute RPG Adventure:", "Generating summary, per request...", ARA.summary_request)
         let summaryTriesLeft = 3
         while (summaryTriesLeft) {
             try {
-                let summary_output = false
-                try {
-                    const generate_url = '/generate_openai';
-                    const response = await fetch(generate_url, {
-                        method: 'POST',
-                        body: JSON.stringify(game.summary_request.body),
-                        headers: getRequestHeaders(),
-                        signal: signal,
-                    });
-
-                    summary_output = await response.json();
-
-                    checkQuotaError(summary_output);
-                    if (summary_output.error) {
-                        console.log("sleeping on summary_output.error =", JSON.stringify(summary_output.error))
-                        await delay(2000)
-                        throw new Error(JSON.stringify(summary_output));
-                    }
-                } catch (error) {
-                    console.error(error);
-                    const errorMsg = "while getting summary";
-                    throw new Error(errorMsg);
-                }
-                try {
-                    const summary_text = summary_output.choices[0]["message"]["content"]
-                    console.log("Absolute RPG Adventure:", "summary data:", summary_output)
-                    // Send back the summary
-                    const summaryRes = await fetch(absoluteRPGAdventureUrl + "/promptSummary", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({
-                            generate_data: { ...generate_data, messages: [] },
-                            context_max_tokens,
-                            ...{...game.summary_request, body: {}},
-                            summary: summary_text,
-                            ARA: {
-                                ...ARA,
-                                chat_id,
-                            },
-                        }),
-                    });
-                    // Get full response from server
-                    data = await summaryRes.json();
-                    if (data.game && (data.game.summaryAgain || data.game.error)) {
-                        // asking for another summary, this one failed somehow
-                        console.warn("Absolute RPG Adventure:", data.game.error)
-                        throw new Error(data.game.error);
-                    }
-                } catch (error) {
-                    console.error(error);
-                    const errorMsg = "while sending summary back";
-                    throw new Error(errorMsg);
-                }
+                data = await updateSummary(signal)
                 if (!data.generate_data) {
                     const errorMsg = "No generate_data error: " + data.game.error;
                     throw new Error(errorMsg);

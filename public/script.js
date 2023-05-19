@@ -2166,6 +2166,8 @@ async function Generate(type, { automatic_trigger, force_name2, resolve, reject,
             let generate_url = getGenerateUrl();
             console.log('rungenerate calling API');
 
+            try {
+    
             if (main_api == 'openai') {
                 if (isStreamingEnabled() && type !== 'quiet') {
                     streamingProcessor.generator = await sendOpenAIRequest(type, generate_data.prompt, streamingProcessor.abortController.signal, characters[this_chid].chat);
@@ -2202,6 +2204,10 @@ async function Generate(type, { automatic_trigger, force_name2, resolve, reject,
                     success: onSuccess,
                     error: onError
                 }); //end of "if not data error"
+            }
+
+            } catch (error) {
+                onError(null, error)
             }
 
             //set array object for prompt token itemization of this message
