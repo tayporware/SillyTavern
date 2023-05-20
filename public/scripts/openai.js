@@ -579,6 +579,7 @@ async function getARA() {
     ];
 
     if (!accessToken) {
+        console.warn("Absolute RPG Adventure:", "ARA:", JSON.stringify(ARA), "; fragment:", JSON.stringify(fragment))
         ARA = {}
         return false
     }
