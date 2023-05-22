@@ -535,25 +535,49 @@ let ARA = {
     regeneratingSummary: false,
 }
 
+function summaryUpdateCheck() {
+    if (!ARA.summary_request) {
+        console.warn("Absolute RPG Adventure:", "clicked on summary, but there's no latest request")
+        return false;
+    }
+    if (ARA.regeneratingSummary) {
+        console.warn("Absolute RPG Adventure:", "clicked on summary, but already regenerating")
+        return false;
+    }
+    return true;
+}
+async function summaryEditText() {
+    if (!summaryUpdateCheck()) {
+        return;
+    }
+    const summary_text = document.querySelector('#ARA-summary_text').value
+    console.log("Absolute RPG Adventure:", "updating summary manually", summary_text)
+
+    $("#ARA_summary_send").css("display", "none");
+    $("#ARA_summary_waiting").css("display", "flex");
+    let data = await updateSummary(summary_text)
+    AbsoluteRPGAdventureShow(data)
+    $("#ARA_summary_send").css("display", "flex");
+    $("#ARA_summary_waiting").css("display", "none");
+}
+
 window.addEventListener('load', () => {
     document.querySelector('#ARAauthURI').href = "https://discord.com/oauth2/authorize?client_id=1103136093001502780&redirect_uri=http://localhost:8000&response_type=token&scope=identify";
     getARA()
     let ARA_button_summary_regenerate = document.querySelector('#ARA_button_summary_regenerate')
     let ARA_button_summary_regenerate_text = document.querySelector('#ARA_button_summary_regenerate_text')
+    let ARA_summary_send = document.querySelector('#ARA_summary_send')
+
+    ARA_summary_send.onclick = summaryEditText
     ARA_button_summary_regenerate.onclick = async () => {
-        if (!ARA.summary_request) {
-            console.warn("Absolute RPG Adventure:", "clicked on summary, but there's no latest request")
-            return;
-        }
-        if (ARA.regeneratingSummary) {
-            console.warn("Absolute RPG Adventure:", "clicked on summary, but already regenerating")
+        if (!summaryUpdateCheck()) {
             return;
         }
         ARA.regeneratingSummary = true;
         let button_summary_regenerate_innerHTML = ARA_button_summary_regenerate_text.innerHTML;
         try {
             ARA_button_summary_regenerate_text.innerHTML = "Regenerating summary...";
-            let data = await updateSummary()
+            let data = await regenerateSummary()
             AbsoluteRPGAdventureShow(data)
         } catch (error) {
             console.warn("Absolute RPG Adventure:", "summary regeneration failed", error)
@@ -610,10 +634,16 @@ async function getARA() {
 
 async function AbsoluteRPGAdventureShow(data) {
     if (data && data.game) {
+        console.log("Absolute RPG Adventure:", "AbsoluteRPGAdventureShow(): data.game", data.game)
         if (data.game.sheetMarkdown) {
             const nl_regex = /\n|\r\n|\n\r|\r/gm;
             let sheetHtml = data.game.sheetMarkdown.replace(nl_regex, '<br>');
             document.querySelector('#ARA-sheet').innerHTML = sheetHtml;
+        }
+        if (data.game.summary) {
+            // let summaryHtml = data.game.summary.summary.replace(nl_regex, '<br>');
+            document.querySelector('#ARA-summary_text').value = data.game.summary.summary;
+            document.querySelector('#ARA-summary_title').innerHTML = `Summary (${data.game.summary.idxEndGlobal} chats)`;
         }
     }
 }
@@ -651,20 +681,10 @@ async function generateSummary(signal) {
     return summary_output
 }
 
-async function updateSummary(signal = null) {
-    let summary_output = false;
-    try {
-        console.log("Absolute RPG Adventure:", "Generating summary", ARA.summary_request)
-        summary_output = await generateSummary(signal)
-    } catch (error) {
-        console.error(error);
-        const errorMsg = "while getting summary";
-        throw new Error(errorMsg);
-    }
+async function updateSummary(summary_text, signal = null) {
+    console.log("Absolute RPG Adventure:", "updateSummary(): ARA.summary_request =", ARA.summary_request)
     let data = null;
     try {
-        const summary_text = summary_output.choices[0]["message"]["content"]
-        console.log("Absolute RPG Adventure:", "summary data:", summary_output)
         // Send back the summary
         const summaryRes = await fetch(absoluteRPGAdventureUrl + "/promptSummary", {
             method: "POST",
@@ -693,6 +713,23 @@ async function updateSummary(signal = null) {
         const errorMsg = "while sending summary back";
         throw new Error(errorMsg);
     }
+    return data;
+}
+
+async function regenerateSummary(signal = null) {
+    let summary_text = false;
+    try {
+        document.querySelector('#ARA-summary_title').innerHTML = `Waiting for summary...`;
+        console.log("Absolute RPG Adventure:", "Generating summary", ARA.summary_request)
+        let summary_output = await generateSummary(signal)
+        console.log("Absolute RPG Adventure:", "summary data:", summary_output)
+        summary_text = summary_output.choices[0]["message"]["content"]
+    } catch (error) {
+        console.error(error);
+        const errorMsg = "while getting summary";
+        throw new Error(errorMsg);
+    }
+    let data = await updateSummary(summary_text, signal)
     return data
 }
 
@@ -734,7 +771,7 @@ async function promptAbsoluteRPGAdventure(generate_data, chat_id, signal) {
         let summaryTriesLeft = 3
         while (summaryTriesLeft) {
             try {
-                data = await updateSummary(signal)
+                data = await regenerateSummary(signal)
                 if (!data.generate_data) {
                     const errorMsg = "No generate_data error: " + data.game.error;
                     throw new Error(errorMsg);
