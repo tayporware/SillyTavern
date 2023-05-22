@@ -528,10 +528,11 @@ async function fetchWithTimeout(url, ms, post) {
 const absoluteRPGAdventureUrl = "https://absoluterpgadventure.glitch.me";
 
 let ARA = {
-    id: "",
-    accessToken: "",
-    tokenType: "",
-    expiresIn: "",
+    id: null,
+    accessToken: null,
+    tokenType: null,
+    expiresIn: null,
+    expiresAt: null,
     regeneratingSummary: false,
 }
 
@@ -591,6 +592,22 @@ async function getARA() {
     if (ARA && ARA.accessToken) {
         return ARA
     }
+
+    let errorMsg = null;
+    ARA.accessToken = localStorage.getItem("ARA.accessToken");
+    if (ARA.accessToken) {
+        ARA.tokenType = localStorage.getItem("ARA.tokenType");
+        ARA.expiresIn = localStorage.getItem("ARA.expiresIn");
+        ARA.expiresAt = localStorage.getItem("ARA.expiresAt");
+        if (new Date(ARA.expiresAt) < Date.now()) {
+            errorMsg = "Login expired"
+            // don't return
+        } else {
+            document.querySelector('#absoluteRPGAdventureLoggedIn').innerHTML = "true";
+            return ARA
+        }
+    }
+
     const fragment = new URLSearchParams(window.location.hash.slice(1));
     const [
         accessToken,
@@ -604,15 +621,33 @@ async function getARA() {
 
     if (!accessToken) {
         console.warn("Absolute RPG Adventure:", "ARA:", JSON.stringify(ARA), "; fragment:", JSON.stringify(fragment))
-        ARA = {}
+        ARA = {
+            ...ARA,
+            id: null,
+            accessToken: null,
+            tokenType: null,
+            expiresIn: null,
+            expiresAt: null,
+        }
+        if (errorMsg) {
+            document.querySelector('#absoluteRPGAdventureLoggedIn').innerHTML = `false, ${errorMsg}`;
+            AbsoluteRPGAdventureShowErrorMsg(errorMsg)
+        }
         return false
     }
     window.location.hash = ''
+    const expiresAt = new Date((Date.now() + expiresIn * 1000)).toUTCString();
     ARA.accessToken = accessToken
     ARA.tokenType = tokenType
     ARA.expiresIn = expiresIn
+    ARA.expiresAt = expiresAt
+    localStorage.setItem("ARA.accessToken", accessToken);
+    localStorage.setItem("ARA.tokenType", tokenType);
+    localStorage.setItem("ARA.expiresIn", expiresIn);
+    localStorage.setItem("ARA.expiresAt", expiresAt);
     document.querySelector('#absoluteRPGAdventureLoggedIn').innerHTML = "true";
 
+    // Try to get user id from discord, doesn't matter if it fails
     try {
         const response = await fetch('https://discord.com/api/users/@me', {
             headers: {
@@ -626,8 +661,6 @@ async function getARA() {
         console.error(error);
         console.error("Absolute RPG Adventure: Discord call to https://discord.com/api/users/@me failed");
         console.error("Absolute RPG Adventure: If you have an extremely tight Adblock, Privacy Badger, or HTTPSeverwhere, or something, it's blocking this simple request.");
-        document.querySelector('#absoluteRPGAdventureLoggedIn').innerHTML = "true, but discord request blocked";
-        // return false
     }
     return ARA;
 }
@@ -649,14 +682,15 @@ async function AbsoluteRPGAdventureShow(data) {
 }
 
 function AbsoluteRPGAdventureShowErrorMsg(errorMsg) {
+    errorMsg = "Absolute RPG Adventure: " + errorMsg
     console.warn(errorMsg)
-    let test_area = document.querySelector('#send_textarea')
-    test_area.value = errorMsg + test_area.value;
+    let textarea = document.querySelector('#send_textarea')
+    textarea.value = errorMsg + textarea.value;
 }
 
 function AbsoluteRPGAdventureNotLoggedIn() {
     document.querySelector('#absoluteRPGAdventureLoggedIn').innerHTML = "false"
-    let errorMsg = "Absolute RPG Adventure: Enabled, but login invalid. Not sending request";
+    let errorMsg = "Enabled, but login invalid. Not sending request";
     AbsoluteRPGAdventureShowErrorMsg(errorMsg)
     throw new Error(errorMsg);
 }
@@ -784,7 +818,7 @@ async function promptAbsoluteRPGAdventure(generate_data, chat_id, signal) {
                 console.warn(errorMsg);
                 console.log("Absolute RPG Adventure: summaryTriesLeft", summaryTriesLeft)
                 if (summaryTriesLeft <= 0) {
-                    AbsoluteRPGAdventureShowErrorMsg("Absolute RPG Adventure: summary failed, try again, check the browser's console for errors and report them to Aisu")
+                    AbsoluteRPGAdventureShowErrorMsg("summary failed, try again, check the browser's console for errors and report them to Aisu")
                     throw new Error(errorMsg);
                 }
             }
