@@ -14,6 +14,7 @@
     <link href="css/jquery-ui.min.css" rel="stylesheet">
     <link href="css/bright.min.css" rel="stylesheet">
     <link href="css/cropper.min.css" rel="stylesheet">
+    <link href="css/toastr.min.css" rel="stylesheet">
 
     <link rel="apple-touch-icon" sizes="57x57" href="img/apple-icon-57x57.png" />
     <link rel="apple-touch-icon" sizes="72x72" href="img/apple-icon-72x72.png" />
@@ -41,6 +42,8 @@
     <script src="scripts/moment.min.js"></script>
     <script src="scripts/cropper.min.js"></script>
     <script src="scripts/jquery-cropper.min.js"></script>
+    <script src="scripts/toastr.min.js"></script>
+    <script type="module" src="scripts/eventemitter.js"></script>
     <script type="module" src="scripts/power-user.js"></script>
     <script type="module" src="scripts/swiped-events.js"></script>
     <link rel="stylesheet" type="text/css" href="style.css">
@@ -60,6 +63,7 @@
     <script type="module" src="scripts/slash-commands.js"></script>
     <script type="module" src="scripts/tags.js"></script>
     <script type="module" src="scripts/secrets.js"></script>
+    <script type="module" src="scripts/context-template.js"></script>
     <script type="text/javascript" src="scripts/toolcool-color-picker.js"></script>
 
     <title>SillyTavern</title>
@@ -367,12 +371,14 @@
                                     </div>
                                 </div>
                                 <div class="range-block">
-                                    <label for="oai_breakdown" class="checkbox_label widthFreeExpand">
-                                        <input id="oai_breakdown" type="checkbox" />
-                                        Token Breakdown
-                                    </label>
+                                    <div class="range-block-title justifyLeft">
+                                        <label for="legacy_streaming" class="checkbox_label">
+                                            <input id="legacy_streaming" type="checkbox" />
+                                            Legacy Streaming Processing
+                                        </label>
+                                    </div>
                                     <div class="toggle-description justifyLeft">
-                                        Display a breakdown of the tokens used in the request.
+                                        Enable this if the streaming doesn't work with your proxy.
                                     </div>
                                 </div>
                                 <div class="range-block">
@@ -747,7 +753,7 @@
                                     <div class="range-block-title">
                                         Seed
                                     </div>
-                                    <input type="number" id="seed_textgenerationwebui" class="text_pole" maxlength="100" />
+                                    <input type="number" id="seed_textgenerationwebui" class="text_pole wide100p" maxlength="100" />
                                 </div>
                             </div>
                             <div id="openai_settings">
@@ -962,7 +968,7 @@
                 </div>
             </div>
         </div>
-        
+
         <div id="ara-show-button" class="drawer">
             <div class="drawer-toggle drawer-header">
                 <div id="AraDrawerIcon" class="drawer-icon fa-solid  fa-address-card  closedIcon" title="ARA Sheet"></div>
@@ -980,7 +986,7 @@
 
                 <div id="ARA-summary" class="width100p">
                     <div id="ARA-summary_title" class="width100p"></div>
-                    
+
 
                     <div id="ARA_button_summary_regenerate" title="Regenerate summary">
                         <i class="fa-lg fa-solid fa-repeat"></i>
@@ -990,7 +996,7 @@
                     <textarea id="ARA-summary_text" class="width100p"></textarea>
 
                     <div style="display: flex;"><div id="ARA_summary_send" class="fa-solid fa-feather-pointed" title="Send summary" style="display: flex;"></div><div id="ARA_summary_waiting" style="display: none;"><div title="Waiting" class="fa-solid fa-hourglass-half"></div></div> Send editted summary</div>
-                    
+
                 </div>
 
                 <div class="scrollableInner">
@@ -1009,7 +1015,7 @@
             </div>
             <div id="rm_api_block" class="drawer-content closedDrawer">
                 <h3 id="title_api">API</h3>
-                <div class="flex-container">
+                <div class="flex-container flexFlowColumn">
                     <div id="main-API-selector-block">
                         <select id="main_api">
                             <option value="kobold">KoboldAI</option>
@@ -1056,8 +1062,11 @@
                                 <h5>Get it here: <a target="_blank" href="https://horde.koboldai.net/register">Register</a><br>
                                     Enter <span class="monospace">0000000000</span> to use anonymous mode.
                                 </h5>
+                                <div>
+                                    <a id="horde_kudos" href="javascript:void(0);">View my Kudos</a>
+                                </div>
                                 <div class="flex-container">
-                                    <input id="horde_api_key" name="horde_api_key" class="text_pole flex1" maxlength="500" type="text" placeholder="0000000000">
+                                    <input id="horde_api_key" name="horde_api_key" class="text_pole flex1" maxlength="500" type="text" placeholder="0000000000" autocomplete="off">
                                     <div title="Clear your API key" class="menu_button fa-solid fa-circle-xmark clear-api-key" data-key="api_key_horde"></div>
                                 </div>
                                 <div class="neutral_warning">For privacy reasons, your API key will be hidden after you reload the page.</div>
@@ -1091,7 +1100,7 @@
                                 </ol>
                             </span>
                             <div class="flex-container">
-                                <input id="api_key_novel" name="api_key_novel" class="text_pole flex1" maxlength="500" size="35" type="text">
+                                <input id="api_key_novel" name="api_key_novel" class="text_pole flex1 wide100p" maxlength="500" size="35" type="text" autocomplete="off">
                                 <div title="Clear your API key" class="menu_button fa-solid fa-circle-xmark clear-api-key" data-key="api_key_novel"></div>
                             </div>
                             <div class="neutral_warning">For privacy reasons, your API key will be hidden after you reload the page.</div>
@@ -1113,24 +1122,30 @@
                         </div>
                     </div>
                     <div id="textgenerationwebui_api" style="display: none;position: relative;">
-                        <div class="oobabooga_logo">
+                        <div class="oobabooga_logo flex-container">
                             <a href="https://github.com/oobabooga/text-generation-webui" target="_blank">
                                 oobabooga/text-generation-webui
                             </a>
+                            <span>
+                                Make sure you run it with <tt>--api</tt> flag
+                            </span>
                         </div>
-                        <span>
-                            Make sure you run it with <tt>--api</tt> flag
-                        </span>
-                        <form action="javascript:void(null);" method="post" enctype="multipart/form-data">
-                            <h4>Blocking API url</h4>
-                            <h5>Example: http://127.0.0.1:5000/</h5>
-                            <input id="textgenerationwebui_api_url_text" name="textgenerationwebui_api_url" class="text_pole" maxlength="500" value="" autocomplete="off">
+                        <div>
+                            <div class="flex-container">
+                                <div class="flex1">
+                                    <h4>Blocking API url</h4>
+                                    <h5>Example: http://127.0.0.1:5000/</h5>
+                                    <input id="textgenerationwebui_api_url_text" name="textgenerationwebui_api_url" class="text_pole wide100p" maxlength="500" value="" autocomplete="off">
+                                </div>
+                                <div class="flex1">
+                                    <h4>Streaming API url</h4>
+                                    <h5>Example: ws://127.0.0.1:5005/api/v1/stream</h5>
+                                    <input id="streaming_url_textgenerationwebui" type="text" class="text_pole wide100p" maxlength="500" value="" autocomplete="off">
+                                </div>
+                            </div>
                             <input id="api_button_textgenerationwebui" class="menu_button" type="submit" value="Connect">
-                            <h4>Streaming API url</h4>
-                            <h5>Example: ws://127.0.0.1:5005/api/v1/stream</h5>
-                            <input id="streaming_url_textgenerationwebui" type="text" class="text_pole" maxlength="500" value="" autocomplete="off">
                             <div id="api_loading_textgenerationwebui" class="api-load-icon fa-solid fa-hourglass fa-spin"></div>
-                        </form>
+                        </div>
                         <div class="online_status4">
                             <div class="online_status_indicator4"></div>
                             <div class="online_status_text4">Not connected</div>
@@ -1148,7 +1163,7 @@
                                 </ol>
                             </span>
                             <div class="flex-container">
-                                <input id="api_key_openai" name="api_key_openai" class="text_pole flex1" maxlength="500" value="" type="text">
+                                <input id="api_key_openai" name="api_key_openai" class="text_pole flex1" maxlength="500" value="" type="text" autocomplete="off">
                                 <div title="Clear your API key" class="menu_button fa-solid fa-circle-xmark clear-api-key" data-key="api_key_openai"></div>
                             </div>
                             <div class="neutral_warning">For privacy reasons, your API key will be hidden after you reload the page.</div>
@@ -1188,7 +1203,7 @@
                         </span>
                         <div class="widthFreeExpand">
                             <div class="flex-container">
-                                <input id="poe_token" class="text_pole flex1" type="text" maxlength="100" />
+                                <input id="poe_token" class="text_pole flex1" type="text" maxlength="100" autocomplete="off" />
                                 <div title="Clear your API key" class="menu_button fa-solid fa-circle-xmark clear-api-key" data-key="api_key_poe"></div>
                             </div>
                             <div class="neutral_warning">For privacy reasons, your API key will be hidden after you reload the page.</div>
@@ -1260,7 +1275,7 @@
                             Trim Incomplete Sentences
                         </label>
                         <!-- Add margin since this is a child of above -->
-                        <label style="margin-left: 1em;"  class="checkbox_label" for="include_newline_checkbox">
+                        <label style="margin-left: 1em;" class="checkbox_label" for="include_newline_checkbox">
                             <input id="include_newline_checkbox" type="checkbox" />
                             Include Newline
                         </label>
@@ -1304,7 +1319,7 @@
                                         Input Sequence
                                     </label>
                                     <div>
-                                        <input id="instruct_input_sequence" class="text_pole textarea_compact" type="text" maxlength="100" />
+                                        <input id="instruct_input_sequence" class="text_pole wide100p textarea_compact" type="text" maxlength="100" />
                                     </div>
                                 </div>
                                 <div class="flex1">
@@ -1312,25 +1327,33 @@
                                         Output Sequence
                                     </label>
                                     <div>
-                                        <input id="instruct_output_sequence" class="text_pole textarea_compact" type="text" maxlength="100" />
+                                        <input id="instruct_output_sequence" class="text_pole wide100p textarea_compact" type="text" maxlength="100" />
                                     </div>
                                 </div>
                             </div>
                             <div class="flex-container">
                                 <div class="flex1">
                                     <label for="instruct_system_sequence">
-                                        System Sequence
+                                        <small>System Sequence</small>
                                     </label>
                                     <div>
-                                        <input id="instruct_system_sequence" class="text_pole textarea_compact" type="text" maxlength="100" />
+                                        <input id="instruct_system_sequence" class="text_pole wide100p textarea_compact" type="text" maxlength="100" />
                                     </div>
                                 </div>
                                 <div class="flex1">
                                     <label for="instruct_stop_sequence">
-                                        Stop Sequence
+                                        <small>Stop Sequence</small>
                                     </label>
                                     <div>
-                                        <input id="instruct_stop_sequence" class="text_pole textarea_compact" type="text" maxlength="100" />
+                                        <input id="instruct_stop_sequence" class="text_pole wide100p textarea_compact" type="text" maxlength="100" />
+                                    </div>
+                                </div>
+                                <div class="flex1">
+                                    <label for="instruct_separator_sequence">
+                                        <small>Separator</small>
+                                    </label>
+                                    <div>
+                                        <input id="instruct_separator_sequence" class="text_pole wide100p textarea_compact" type="text" maxlength="100" />
                                     </div>
                                 </div>
                             </div>
@@ -1371,6 +1394,21 @@
                         <label class="checkbox_label" for="collapse-newlines-checkbox"><input id="collapse-newlines-checkbox" type="checkbox" />
                             Remove Empty New Lines from Output
                         </label>
+                        <div id="context-templates-block" class="template_element">
+                            <h4>
+                                Context Templates
+                            </h4>
+                            <div class="flex-container flexGap5">
+                                <select id="prompt_template" class="flex1 margin0">
+                                    <option value="None">None (Default)</option>
+                                    <option value="Classic">Classic</option>
+                                    <option value="Pygmalion">Pygmalion</option>
+                                </select>
+                                <div id="context_template_edit" class="menu_button fa-solid fa-pencil margin0" title="Edit"></div>
+                                <div id="context_template_new" class="menu_button fa-solid fa-plus margin0" title="Add new"></div>
+                                <div id="context_template_delete" class="menu_button fa-solid fa-trash-can margin0" title="Delete"></div>
+                            </div>
+                        </div>
                         <div>
                             <h4>Pygmalion Formatting</h4>
                             <select id="pygmalion_formatting">
@@ -1401,24 +1439,6 @@
                                     <small>Next chunks (tokens)</small>
                                     <input id="multigen_next_chunks" type="number" class="text_pole textarea_compact" min="1" max="512" />
                                 </label>
-                            </div>
-                        </div>
-                        <div id="context-templates-block" style="display:none">
-                            <h4>
-                                Context Templates
-                            </h4>
-                            <div>
-                                <label>Presets:</label>
-                                <div class="flex-container flexGap5">
-                                    <select id="prompt_template" class="flex1 margin0">
-                                        <option value="None">None</option>
-                                        <option value="Classic">Classic</option>
-                                        <option value="Pygmalion">Pygmalion</option>
-                                    </select>
-                                    <div id="context_template_edit" class="menu_button fa-solid fa-pencil margin0" title="Edit"></div>
-                                    <div id="context_template_new" class="menu_button fa-solid fa-plus margin0" title="Add new"></div>
-                                    <div id="context_template_delete" class="menu_button fa-solid fa-trash-can margin0" title="Delete"></div>
-                                </div>
                             </div>
                         </div>
                     </div>
@@ -1491,12 +1511,21 @@
                             </div>
                         </div>
 
-                        <div class="flex1 range-block">
+                        <div class="flex1 range-block flex-container flexFlowColumn">
                             <label title="Entries can activate other entries by mentioning their keywords" class="checkbox_label">
                                 <input id="world_info_recursive" type="checkbox" />
                                 <span>
                                     Recursive scanning
                                     <a href="/notes#recursivescanning" class="notes-link" target="_blank">
+                                        <span class="note-link-span">?</span>
+                                    </a>
+                                </span>
+                            </label>
+                            <label title="Lookup for the entry keys in the context will respect the case" class="checkbox_label">
+                                <input id="world_info_case_sensitive" type="checkbox" />
+                                <span>
+                                    Case-sensitive keys
+                                    <a href="/notes#casesensitivekeys" class="notes-link" target="_blank">
                                         <span class="note-link-span">?</span>
                                     </a>
                                 </span>
@@ -1778,60 +1807,60 @@
                     <div name="NameAndAvatar" class="flex-container flexFlowColumn drawer25pWidth">
 
 
-                    <div class="inline-drawer wide100p flexFlowColumn">
+                        <div class="inline-drawer wide100p flexFlowColumn">
 
-                        <div class="flex-container flexFlowColumn">
+                            <div class="flex-container flexFlowColumn">
+                                <h4>
+                                    Send on Enter
+                                </h4>
+                                <select id="send_on_enter">
+                                    <option value="-1">Always disabled</option>
+                                    <option value="0">Automatic (desktop)</option>
+                                    <option value="1">Always enabled</option>
+                                </select>
+                            </div>
+
+                            <div id="groupCurrentMemberListToggle" class="inline-drawer-toggle inline-drawer-header">
+                                <b>Auto-swipe</b>
+                                <div class="fa-solid fa-circle-chevron-down inline-drawer-icon down"></div>
+                            </div>
+                            <div class="inline-drawer-content">
+
+                                <label class="checkbox_label" for="auto_swipe">
+                                    <input id="auto_swipe" type="checkbox" />
+                                    Enabled
+                                </label>
+                                <div>Minimum generated message length</div>
+                                <input id="auto_swipe_minimum_length" name="auto_swipe_minimum_length" type="number" min="0" step="1" value="0" class="text_pole">
+                                <div>Blacklisted words</div>
+                                <div class="auto_swipe">
+                                    <textarea id="auto_swipe_blacklist" name="auto_swipe_blacklist" placeholder="words you dont want generated separated by comma ','" class="text_pole textarea_compact" maxlength="500" value="" autocomplete="off" rows="3"></textarea>
+                                    <div>Blacklisted word count to swipe</div>
+                                    <input id="auto_swipe_blacklist_threshold" name="auto_swipe_blacklist_threshold" type="number" min="0" step="1" value="1" class="text_pole">
+                                </div>
+                            </div>
+
                             <h4>
-                                Send on Enter
+                                Absolute RPG Adventure
                             </h4>
-                            <select id="send_on_enter">
-                                <option value="-1">Always disabled</option>
-                                <option value="0">Automatic (desktop)</option>
-                                <option value="1">Always enabled</option>
-                            </select>
-                        </div>
+                            <label for="absoluteRPGAdventure">
+                                <input id="absoluteRPGAdventure" type="checkbox" />
+                                Enable
+                            </label>
 
-                        <div id="groupCurrentMemberListToggle" class="inline-drawer-toggle inline-drawer-header">
-                            <b>Auto-swipe</b>
-                            <div class="fa-solid fa-circle-chevron-down inline-drawer-icon down"></div>
-                        </div>
-                        <div class="inline-drawer-content">
-
-                        <label class="checkbox_label" for="auto_swipe">
-                            <input id="auto_swipe" type="checkbox" />
-                            Enabled
-                        </label>
-                            <div>Minimum generated message length</div>
-                            <input id="auto_swipe_minimum_length" name="auto_swipe_minimum_length" type="number" min="0" step="1" value="0" class="text_pole">
-                            <div>Blacklisted words</div>
-                            <div class="auto_swipe">
-                                <input id="auto_swipe_blacklist" name="auto_swipe_blacklist" placeholder="words you dont want generated separated by comma ','" class="text_pole" maxlength="500" value="" autocomplete="off">
-                                <div>Blacklisted word count to swipe</div>
-                                <input id="auto_swipe_blacklist_threshold" name="auto_swipe_blacklist_threshold" type="number" min="0" step="1" value="1" class="text_pole">
+                            <div>
+                                <a href="" id="ARAauthURI">Login</a>
+                            </div>
+                            <div>
+                                <label for="absoluteRPGAdventureToken">Logged in:</label>
+                                <label id="absoluteRPGAdventureLoggedIn">false</label>
                             </div>
                         </div>
-
-                        <h4>
-                            Absolute RPG Adventure
-                        </h4>
-                        <label for="absoluteRPGAdventure">
-                            <input id="absoluteRPGAdventure" type="checkbox" />
-                            Enable
-                        </label>
-
-                        <div>
-                            <a href="" id="ARAauthURI">Login</a>
-                        </div>
-                        <div>
-                            <label for="absoluteRPGAdventureToken">Logged in:</label>
-                            <label id="absoluteRPGAdventureLoggedIn">false</label>
-                        </div>
-                    </div>
 
                         <div name="NameChanger">
                             <h4>Name</h4>
                             <div class="change_name">
-                                <input id="your_name" name="your_name" placeholder="Enter your name" class="text_pole" maxlength="50" value="" autocomplete="off">
+                                <input id="your_name" name="your_name" placeholder="Enter your name" class="text_pole wide100p" maxlength="50" value="" autocomplete="off">
                                 <div id="your_name_button" class="menu_button fa-solid fa-check" title="Click to set a new User Name">
                                 </div>
                             </div>
@@ -1957,7 +1986,7 @@
                                     <label for="create_button" id="create_button_label" class="menu_button fa-solid fa-user-check" title="Create Character">
                                         <input type="submit" id="create_button" name="create_button">
                                     </label>
-                                    <div id="delete_button" class="menu_button fa-solid fa-trash-can " title="Delete Character"></div>
+                                    <div id="delete_button" class="menu_button fa-solid fa-skull " title="Delete Character"></div>
                                 </div>
                             </div>
                             <div title="Token counts may be inaccurate and provided just for reference." id="result_info">&nbsp;</div>
@@ -1966,7 +1995,7 @@
 
                         <div id="tags_div">
                             <div class="tag_controls">
-                                <input id="tagInput" class="text_pole tag_input" placeholder="Search / Create tags" maxlength="25" />
+                                <input id="tagInput" class="text_pole tag_input wide100p margin0" placeholder="Search / Create tags" maxlength="25" />
                                 <div class="tags_view menu_button fa-solid fa-tags" title="View all tags"></div>
                             </div>
                             <div id="tagList" class="tags"></div>
@@ -2019,15 +2048,15 @@
                         </div>
                         <div class="inline-drawer-content">
                             <div name="group-metadata-controls" class="marginTopBot5">
-                                <input id="rm_group_chat_name" class="text_pole" type="text" name="chat_name" placeholder="Chat Name (Optional)" maxlength="100" />
+                                <input id="rm_group_chat_name" class="text_pole wide100p" type="text" name="chat_name" placeholder="Chat Name (Optional)" maxlength="100" />
                                 <div id="group_tags_div" class="wide100p">
                                     <div class="tag_controls">
-                                        <input id="groupTagInput" class="text_pole tag_input flex1" placeholder="Search / Create tags" maxlength="25" />
-                                        <div class="tags_view menu_button fa-solid fa-tags" title="View all tags"></div>
+                                        <input id="groupTagInput" class="text_pole tag_input flex1 margin0" placeholder="Search / Create tags" maxlength="25" />
+                                        <div class="tags_view menu_button fa-solid fa-tags margin0" title="View all tags"></div>
                                     </div>
                                     <div id="groupTagList" class="tags paddingTopBot5"></div>
                                 </div>
-                                <div id="rm_group_top_bar" class="flex-container spaceEvenly width100p">
+                                <div id="rm_group_top_bar" class="flex-container spaceBetween width100p">
                                     <div name="GroupStragegyAndOrder" id="rm_group_buttons" class="fontsize80p flex-container paddingLeftRight5">
                                         <div class="">
                                             <div class="flex-container flexnowrap width100p whitespacenowrap">
@@ -2088,8 +2117,8 @@
                         <div class="inline-drawer-content">
                             <div name="Unadded Char List" class="flex-container flexFlowColumn overflowYAuto flex1">
                                 <div id="rm_group_add_members_header">
-                                    <input id="rm_group_filter" class="text_pole" type="search" placeholder="Filter..." maxlength="100" />
-                                    <div id="group_fav_filter" class="menu_button fa-solid fa-ranking-star" title="Show only favorites"></div>
+                                    <input id="rm_group_filter" class="text_pole margin0" type="search" placeholder="Filter..." maxlength="100" />
+                                    <div id="group_fav_filter" class="menu_button fa-solid fa-ranking-star margin0" title="Show only favorites"></div>
                                 </div>
                                 <div id="rm_group_add_members" class="overflowYAuto flex-container"></div>
                             </div>
@@ -2111,7 +2140,7 @@
                             <div id="rm_button_create" title="Create New Character" class="menu_button fa-solid fa-user-plus "></div>
                             <div id="character_import_button" title="Import Character from File" class="menu_button fa-solid fa-file-arrow-up "></div>
                             <div id="rm_button_group_chats" title="Create New Chat Group" class="menu_button fa-solid fa-users-gear "></div>
-                            <input id="character_search_bar" class="text_pole" type="search" placeholder="Search..." maxlength="50" />
+                            <input id="character_search_bar" class="text_pole width100p" type="search" placeholder="Search..." maxlength="50" />
                             <select id="character_sort_order" title="Characters sorting order">
                                 <option data-field="name" data-order="asc">A-Z</option>
                                 <option data-field="name" data-order="desc">Z-A</option>
@@ -2241,6 +2270,58 @@
     </div>
 
     <!-- templates for JS to reuse when needed -->
+    <div id="context_editor_template" class="template_element">
+        <div class="context_editor">
+            <h3>Context Template Editor</h3>
+
+            <div class="inline-drawer wide100p">
+                <div class="inline-drawer-toggle inline-drawer-header">
+                    Substitution Parameters
+                    <div class="fa-solid fa-circle-chevron-down inline-drawer-icon down"></div>
+                </div>
+                <div class="inline-drawer-content">
+                    <i>Click to copy.</i>
+                    <ul class="template_parameters_list justifyLeft margin0">
+                        <li><code>{{char}}</code> - current character name</li>
+                        <li><code>{{user}}</code> - current user name</li>
+                        <li><code>{{description}}</code> - character description</li>
+                        <li><code>{{scenario}}</code> - character or group scenario</li>
+                        <li><code>{{personality}}</code> - character personality</li>
+                        <li><code>{{mesExamples}}</code> - message examples</li>
+                        <li><code>{{wiBeforeCharacter}}</code> - activated World Info entries (Before Char)</li>
+                        <li><code>{{wiAfterCharacter}}</code> - activated World Info entries (After Char)</li>
+                        <li><code>{{instructSystemPrompt}}</code> - system prompt (Instruct mode only)</li>
+                    </ul>
+                </div>
+            </div>
+            <div>
+                <div class="margin-bot-10px wide100p justifyLeft">
+                    Story String Template
+                </div>
+                <textarea class="wide100p textarea_compact story_string_template" rows="8"></textarea>
+                <div>
+                    <small>Lines containing parameters resolving to an empty value will be removed from the template string.</small>
+                </div>
+            </div>
+            <div>
+                <div class="title_restorable">
+                    <span>Chat Injections</span>
+                    <div title="Add chat injection" class="menu_button">
+                        <div class="fa-solid fa-plus"></div>
+                    </div>
+                </div>
+                <div class="chat_injections_list flex-container flexFlowColumn flexGap5 wide100p"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="chat_injection_template" class="template_element">
+        <div class="chat_injection flex-container wide100p flexGap5 flexnowrap">
+            <input class="chat_injection_text textarea_compact text_pole flex2" placeholder="Injection text (supports parameters)" type="text" />
+            <input class="chat_injection_depth textarea_compact text_pole flex1" placeholder="Injection depth" type="number" min="0" max="100" />
+            <div title="Remove injection" class="menu_button fa-solid fa-xmark chat_injection_remove"></div>
+        </div>
+    </div>
 
     <div id="group_scenario_template" class="template_element">
         <div class="group_scenario range-block flexFlowColumn flex-container">
@@ -2426,9 +2507,9 @@
     </div>
 
     <div id="message_template" class="template_element">
-        <div class="mes" mesid="${count_view_mes}" ch_name="${characterName}" is_user="${mes.is_user}" is_system="${mes.is_system}">
+        <div class="mes" mesid="" ch_name="" is_user="" is_system="" bookmark_link="">
             <div class="for_checkbox"></div><input type="checkbox" class="del_checkbox">
-            <div>
+            <div class="mesAvatarWrapper">
                 <div class="avatar">
                     <img src="">
 
@@ -2437,10 +2518,12 @@
             </div>
             <div class="swipe_left fa-solid fa-chevron-left"></div>
             <div class="mes_block">
-                <div class="ch_name">
+                <div class="ch_name flex-container justifySpaceBetween">
                     <span class="name_text">${characterName}</span>
 
                     <div class="mes_buttons">
+                        <div title="Open bookmark chat" class="mes_bookmark fa-solid fa-bookmark"></div>
+                        <div title="Generate Image" class="sd_message_gen fa-solid fa-paintbrush"></div>
                         <div title="Narrate" class="mes_narrate fa-solid fa-bullhorn"></div>
                         <div title="Prompt" class="mes_prompt fa-solid fa-square-poll-horizontal "></div>
                         <div title="Copy" class="mes_copy fa-solid fa-copy "></div>
@@ -2456,6 +2539,13 @@
                     </div>
                 </div>
                 <div class=mes_text></div>
+                <div class="mes_img_container">
+                    <div class="mes_img_controls">
+                        <div title="Enlarge" class="right_menu_button fa-lg fa-solid fa-magnifying-glass mes_img_enlarge"></div>
+                        <div title="Delete" class="right_menu_button fa-lg fa-solid fa-trash-can mes_img_delete"></div>
+                    </div>
+                    <img class="mes_img" src="" />
+                </div>
                 <div title="Stop Streaming" class="mes_stop">
                     <i class="fa-xl fa-solid fa-circle-stop"></i>
                 </div>
@@ -2531,17 +2621,12 @@
     <div id="typing_indicator_template" class="template_element">
         <div class="typing_indicator"><span class="typing_indicator_name">CHAR</span> is typing</div>
     </div>
+    <div id="movingDivs"></div>
     <div id="sheld">
         <div id="sheldheader" class="fa-solid fa-grip drag-grabber"></div>
-        <!-- <div class="pull-tab"></div> -->
         <div id="chat">
         </div>
         <div id="form_sheld">
-            <div id="token_breakdown" style="display:none;">
-                <div>
-                    <!-- Token Breakdown Goes Here -->
-                </div>
-            </div>
             <div id="dialogue_del_mes">
                 <div id="dialogue_del_mes_ok" class="menu_button">Delete</div>
                 <div id="dialogue_del_mes_cancel" class="menu_button">Cancel</div>
@@ -2553,7 +2638,7 @@
                     <div id="loading_mes">
                         <div title="Loading" class="fa-solid fa-hourglass-half"></div>
                     </div>
-                    <div id="send_but" class="fa-solid fa-feather-pointed" title="Send a message"></div>
+                    <div id="send_but" class="fa-solid fa-paper-plane" title="Send a message"></div>
                 </div>
             </form>
         </div>
@@ -2569,6 +2654,10 @@
             <a id="option_new_bookmark">
                 <i class="fa-lg fa-solid fa-bookmark"></i>
                 <span>Save bookmark</span>
+            </a>
+            <a id="option_toggle_AN">
+                <i class="fa-lg fa-solid fa-note-sticky"></i>
+                <span>Author's Note Show/Hide</span>
             </a>
             <a id="option_convert_to_group">
                 <i class="fa-lg fa-solid fa-people-arrows"></i>
@@ -2611,6 +2700,15 @@
     <div id="rawPromptPopup" class="list-group">
         <div id="rawPromptWrapper" class="tokenItemizingSubclass"></div>
     </div>
+
+    <script>
+        // Configure toast library:
+        toastr.options.escapeHtml = true; // Prevent raw HTML inserts
+        toastr.options.timeOut = 4000; // How long the toast will display without user interaction
+        toastr.options.extendedTimeOut = 10000; // How long the toast will display after a user hovers over it
+        toastr.options.progressBar = true; // Visually indicate how long before a toast expires.
+        toastr.options.closeButton = true; // enable a close button
+    </script>
 </body>
 
 </html>

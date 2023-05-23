@@ -17,6 +17,8 @@ import {
     this_chid,
     callPopup,
     getRequestHeaders,
+    system_message_types,
+    replaceBiasMarkup,
 } from "../script.js";
 import { groups, openGroupChat, selected_group } from "./group-chats.js";
 
@@ -101,7 +103,7 @@ const default_settings = {
     openai_model: 'gpt-3.5-turbo',
     jailbreak_system: false,
     reverse_proxy: '',
-    oai_breakdown: false,
+    legacy_streaming: false,
 };
 
 const oai_settings = {
@@ -126,7 +128,7 @@ const oai_settings = {
     openai_model: 'gpt-3.5-turbo',
     jailbreak_system: false,
     reverse_proxy: '',
-    oai_breakdown: false,
+    legacy_streaming: false,
 };
 
 let openai_setting_names;
@@ -146,7 +148,7 @@ function validateReverseProxy() {
         new URL(oai_settings.reverse_proxy);
     }
     catch (err) {
-        callPopup('Entered reverse proxy address is not a valid URL', 'text');
+        toastr.error('Entered reverse proxy address is not a valid URL');
         setOnlineStatus('no_connection');
         resultCheckStatusOpen();
         throw err;
@@ -157,7 +159,7 @@ function setOpenAIOnlineStatus(value) {
     is_get_status_openai = value;
 }
 
-function setOpenAIMessages(chat, quietPrompt) {
+function setOpenAIMessages(chat) {
     let j = 0;
     // clean openai msgs
     openai_msgs = [];
@@ -165,15 +167,19 @@ function setOpenAIMessages(chat, quietPrompt) {
         let role = chat[j]['is_user'] ? 'user' : 'assistant';
         let content = chat[j]['mes'];
 
-        // for groups - prepend a character's name
-        if (selected_group) {
+        // 100% legal way to send a message as system
+        if (chat[j].extra?.type === system_message_types.NARRATOR) {
+            role = 'system';
+        }
+
+        // for groups or sendas command - prepend a character's name
+        if (selected_group || chat[j].force_avatar) {
             content = `${chat[j].name}: ${content}`;
         }
 
-        // replace bias markup
-        //content = (content ?? '').replace(/{.*}/g, '');
-        content = (content ?? '').replace(/{{(\*?.*\*?)}}/g, '');
+        content = replaceBiasMarkup(content);
 
+        // remove caret return (waste of tokens)
         content = content.replace(/\r/gm, '');
 
         // Apply the "wrap in quotes" option
@@ -182,16 +188,13 @@ function setOpenAIMessages(chat, quietPrompt) {
         j++;
     }
 
+    // Add chat injections, 100 = maximum depth of injection. (Why would you ever need more?)
     for (let i = 0; i < 100; i++) {
         const anchor = getExtensionPrompt(extension_prompt_types.IN_CHAT, i);
 
         if (anchor && anchor.length) {
             openai_msgs.splice(i, 0, { "role": 'system', 'content': anchor.trim() })
         }
-    }
-
-    if (quietPrompt) {
-        openai_msgs.splice(0, 0, { role: 'system', content: quietPrompt });
     }
 }
 
@@ -277,7 +280,7 @@ function formatWorldInfo(value) {
     return `[Details of the fictional world the RP is set in:\n${value}]\n`;
 }
 
-async function prepareOpenAIMessages(name2, storyString, worldInfoBefore, worldInfoAfter, extensionPrompt, bias, type) {
+async function prepareOpenAIMessages(name2, storyString, worldInfoBefore, worldInfoAfter, extensionPrompt, bias, type, quietPrompt) {
     const isImpersonate = type == "impersonate";
     let this_max_context = oai_settings.openai_max_context;
     let nsfw_toggle_prompt = "";
@@ -355,6 +358,12 @@ async function prepareOpenAIMessages(name2, storyString, worldInfoBefore, worldI
         await delay(1);
     }
 
+    if (quietPrompt) {
+        const quietPromptMessage = { role: 'system', content: quietPrompt };
+        total_count += handler_instance.count([quietPromptMessage], true, 'quiet');
+        openai_msgs.push(quietPromptMessage);
+    }
+
     if (isImpersonate) {
         const impersonateMessage = { "role": "system", "content": substituteParams(oai_settings.impersonation_prompt) };
         openai_msgs.push(impersonateMessage);
@@ -372,8 +381,6 @@ async function prepareOpenAIMessages(name2, storyString, worldInfoBefore, worldI
             // get the current example block with multiple user/bot messages
             let example_block = element;
             // add the first message from the user to tell the model that it's a new dialogue
-            // TODO: instead of role user content use role system name example_user
-            // message from the user so the model doesn't confuse the context (maybe, I just think that this should be done)
             if (example_block.length != 0) {
                 examples_tosend.push(new_chat_msg);
             }
@@ -453,7 +460,7 @@ async function prepareOpenAIMessages(name2, storyString, worldInfoBefore, worldI
     handler_instance.log();
     return [
         openai_msgs_tosend,
-        oai_settings.oai_breakdown ? handler_instance.counts : false,
+        handler_instance.counts,
     ];
 }
 
@@ -495,9 +502,10 @@ function tryParseStreamingError(str) {
 }
 
 function checkQuotaError(data) {
-    const errorText = `<h3>You have no credits left to use with this API key.<br>
-    Check your billing details on the
-    <a href="https://platform.openai.com/account/usage" target="_blank">OpenAI website.</a></h3>`;
+    const errorText = `<h3>Encountered an error while processing your request.<br>
+    Check you have credits available on your
+    <a href="https://platform.openai.com/account/usage" target="_blank">OpenAI account</a>.<br>
+    If you have sufficient credits, please try again later.</h3>`;
 
     if (!data) {
         return;
@@ -947,6 +955,7 @@ async function sendOpenAIRequest(type, openai_msgs_tosend, signal, chat_id) {
             const decoder = new TextDecoder();
             const reader = response.body.getReader();
             let getMessage = "";
+            let messageBuffer = "";
             let resetting = false;
             while (true) {
                 let { done, value } = await reader.read();
@@ -954,7 +963,18 @@ async function sendOpenAIRequest(type, openai_msgs_tosend, signal, chat_id) {
 
                 tryParseStreamingError(response);
 
-                let eventList = response.split("\n");
+                let eventList = [];
+
+                // ReadableStream's buffer is not guaranteed to contain full SSE messages as they arrive in chunks
+                // We need to buffer chunks until we have one or more full messages (separated by double newlines)
+                if (!oai_settings.legacy_streaming) {
+                    messageBuffer += response;
+                    eventList = messageBuffer.split("\n\n");
+                    // Last element will be an empty string or a leftover partial message
+                    messageBuffer = eventList.pop();
+                } else {
+                    eventList = response.split("\n");
+                }
                 for (let event of eventList) {
                     if (!event.startsWith("data"))
                         continue;
@@ -1097,7 +1117,7 @@ function countTokens(messages, full = false) {
         else {
             jQuery.ajax({
                 async: false,
-                type: 'POST', // 
+                type: 'POST', //
                 url: `/tokenize_openai?model=${oai_settings.openai_model}`,
                 data: JSON.stringify([message]),
                 dataType: "json",
@@ -1144,6 +1164,7 @@ function loadOpenAISettings(data, settings) {
     oai_settings.openai_max_tokens = settings.openai_max_tokens ?? default_settings.openai_max_tokens;
     oai_settings.bias_preset_selected = settings.bias_preset_selected ?? default_settings.bias_preset_selected;
     oai_settings.bias_presets = settings.bias_presets ?? default_settings.bias_presets;
+    oai_settings.legacy_streaming = settings.legacy_streaming ?? default_settings.legacy_streaming;
 
     if (settings.nsfw_toggle !== undefined) oai_settings.nsfw_toggle = !!settings.nsfw_toggle;
     if (settings.keep_example_dialogue !== undefined) oai_settings.keep_example_dialogue = !!settings.keep_example_dialogue;
@@ -1152,7 +1173,6 @@ function loadOpenAISettings(data, settings) {
     if (settings.nsfw_first !== undefined) oai_settings.nsfw_first = !!settings.nsfw_first;
     if (settings.openai_model !== undefined) oai_settings.openai_model = settings.openai_model;
     if (settings.jailbreak_system !== undefined) oai_settings.jailbreak_system = !!settings.jailbreak_system;
-    if (settings.oai_breakdown !== undefined) oai_settings.oai_breakdown = !!settings.oai_breakdown;
 
     $('#stream_toggle').prop('checked', oai_settings.stream_openai);
 
@@ -1168,7 +1188,7 @@ function loadOpenAISettings(data, settings) {
     $('#wrap_in_quotes').prop('checked', oai_settings.wrap_in_quotes);
     $('#nsfw_first').prop('checked', oai_settings.nsfw_first);
     $('#jailbreak_system').prop('checked', oai_settings.jailbreak_system);
-    $('#oai_breakdown').prop('checked', oai_settings.oai_breakdown);
+    $('#legacy_streaming').prop('checked', oai_settings.legacy_streaming);
 
     if (settings.main_prompt !== undefined) oai_settings.main_prompt = settings.main_prompt;
     if (settings.nsfw_prompt !== undefined) oai_settings.nsfw_prompt = settings.nsfw_prompt;
@@ -1217,8 +1237,8 @@ async function getStatusOpen() {
         };
 
         return jQuery.ajax({
-            type: 'POST', // 
-            url: '/getstatus_openai', // 
+            type: 'POST', //
+            url: '/getstatus_openai', //
             data: JSON.stringify(data),
             beforeSend: function () {
                 if (oai_settings.reverse_proxy) {
@@ -1288,7 +1308,8 @@ async function saveOpenAIPreset(name, settings) {
         jailbreak_system: settings.jailbreak_system,
         impersonation_prompt: settings.impersonation_prompt,
         bias_preset_selected: settings.bias_preset_selected,
-        oai_breakdown: settings.oai_breakdown,
+        reverse_proxy: settings.reverse_proxy,
+        legacy_streaming: settings.legacy_streaming,
     };
 
     const savePresetSettings = await fetch(`/savepreset_openai?name=${name}`, {
@@ -1335,7 +1356,7 @@ async function showApiKeyUsage() {
     }
     catch (err) {
         console.error(err);
-        callPopup('Invalid API key', 'text');
+        toastr.error('Invalid API key');
     }
 }
 
@@ -1400,7 +1421,7 @@ async function createNewLogitBiasPreset() {
     }
 
     if (name in oai_settings.bias_presets) {
-        callPopup('Preset name should be unique.', 'text');
+        toastr.error('Preset name should be unique.');
         return;
     }
 
@@ -1437,12 +1458,12 @@ async function onLogitBiasPresetImportFileChange(e) {
     e.target.value = '';
 
     if (name in oai_settings.bias_presets) {
-        callPopup('Preset name should be unique.', 'text');
+        toastr.error('Preset name should be unique.');
         return;
     }
 
     if (!Array.isArray(importedFile)) {
-        callPopup('Invalid logit bias preset file.', 'text');
+        toastr.error('Invalid logit bias preset file.');
         return;
     }
 
@@ -1547,12 +1568,13 @@ function onSettingsPresetChange() {
         wrap_in_quotes: ['#wrap_in_quotes', 'wrap_in_quotes', true],
         nsfw_first: ['#nsfw_first', 'nsfw_first', true],
         jailbreak_system: ['#jailbreak_system', 'jailbreak_system', true],
-        oai_breakdown: ['#oai_breakdown', 'oai_breakdown', true],
         main_prompt: ['#main_prompt_textarea', 'main_prompt', false],
         nsfw_prompt: ['#nsfw_prompt_textarea', 'nsfw_prompt', false],
         jailbreak_prompt: ['#jailbreak_prompt_textarea', 'jailbreak_prompt', false],
         impersonation_prompt: ['#impersonation_prompt_textarea', 'impersonation_prompt', false],
         bias_preset_selected: ['#openai_logit_bias_preset', 'bias_preset_selected', false],
+        reverse_proxy: ['#openai_reverse_proxy', 'reverse_proxy', false],
+        legacy_streaming: ['#legacy_streaming', 'legacy_streaming', false],
     };
 
     for (const [key, [selector, setting, isCheckbox]] of Object.entries(settingsToUpdate)) {
@@ -1720,16 +1742,6 @@ $(document).ready(function () {
         saveSettingsDebounced();
     });
 
-    $("#oai_breakdown").on('change', function () {
-        oai_settings.oai_breakdown = !!$(this).prop("checked");
-        if (!oai_settings.oai_breakdown) {
-            $("#token_breakdown").css('display', 'none');
-        } else {
-            $("#token_breakdown").css('display', 'flex');
-        }
-        saveSettingsDebounced();
-    });
-
     // auto-select a preset based on character/group name
     $(document).on("click", ".character_select", function () {
         const chid = $(this).attr('chid');
@@ -1756,7 +1768,7 @@ $(document).ready(function () {
     $("#update_oai_preset").on('click', async function () {
         const name = oai_settings.preset_settings_openai;
         await saveOpenAIPreset(name, oai_settings);
-        callPopup('Preset updated', 'text');
+        toastr.success('Preset updated');
     });
 
     $("#main_prompt_restore").on('click', function () {
@@ -1780,6 +1792,11 @@ $(document).ready(function () {
     $("#impersonation_prompt_restore").on('click', function () {
         oai_settings.impersonation_prompt = default_impersonation_prompt;
         $('#impersonation_prompt_textarea').val(oai_settings.impersonation_prompt);
+        saveSettingsDebounced();
+    });
+
+    $('#legacy_streaming').on('input', function () {
+        oai_settings.legacy_streaming = !!$(this).prop('checked');
         saveSettingsDebounced();
     });
 
