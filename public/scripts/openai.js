@@ -542,15 +542,24 @@ let ARA_local = {
 
 function summaryUpdateCheck() {
     if (!ARA_local.summary_request) {
-        console.warn("Absolute RPG Adventure:", "clicked on summary, but there's no latest request")
+        // TODO: save locally so you're able to update after reloading the page
+        console.warn("Absolute RPG Adventure:", "tried to update summary, but there's no latest request")
+        return false;
+    }
+    if (!ARA_local.context_max_tokens) {
+        console.warn("Absolute RPG Adventure:", "tried to update summary, but context_max_tokens is not defined, do at least one prompt to set it")
         return false;
     }
     if (ARA_local.regeneratingSummary) {
-        console.warn("Absolute RPG Adventure:", "clicked on summary, but already regenerating")
+        console.warn("Absolute RPG Adventure:", "tried to update summary, but already regenerating")
         return false;
     }
     return true;
 }
+function summaryRegenerateCheck() {
+    return summaryUpdateCheck();
+}
+
 async function summaryEditText() {
     if (!summaryUpdateCheck()) {
         return;
@@ -558,12 +567,19 @@ async function summaryEditText() {
     const summary_text = document.querySelector('#ARA-summary_text').value
     console.log("Absolute RPG Adventure:", "updating summary manually", summary_text)
 
+    ARA_local.regeneratingSummary = true;
     $("#ARA_summary_send").css("display", "none");
     $("#ARA_summary_waiting").css("display", "flex");
-    let data = await updateSummary(summary_text)
-    AbsoluteRPGAdventureShow(data)
-    $("#ARA_summary_send").css("display", "flex");
-    $("#ARA_summary_waiting").css("display", "none");
+    try {
+        let data = await updateSummary(summary_text, true)
+        AbsoluteRPGAdventureShow(data)
+    } catch (error) {
+        console.error(error)
+    } finally {
+        ARA_local.regeneratingSummary = false;
+        $("#ARA_summary_send").css("display", "flex");
+        $("#ARA_summary_waiting").css("display", "none");
+    }
 }
 
 window.addEventListener('load', () => {
@@ -575,7 +591,7 @@ window.addEventListener('load', () => {
 
     ARA_summary_send.onclick = summaryEditText
     ARA_button_summary_regenerate.onclick = async () => {
-        if (!summaryUpdateCheck()) {
+        if (!summaryRegenerateCheck()) {
             return;
         }
         ARA_local.regeneratingSummary = true;
@@ -586,9 +602,10 @@ window.addEventListener('load', () => {
             AbsoluteRPGAdventureShow(data)
         } catch (error) {
             console.warn("Absolute RPG Adventure:", "summary regeneration failed", error)
+        } finally {
+            ARA_local.regeneratingSummary = false;
+            ARA_button_summary_regenerate_text.innerHTML = button_summary_regenerate_innerHTML;
         }
-        ARA_local.regeneratingSummary = false;
-        ARA_button_summary_regenerate_text.innerHTML = button_summary_regenerate_innerHTML;
     }
 });
 
@@ -728,7 +745,7 @@ async function generateSummary(signal) {
     return summary_output
 }
 
-async function updateSummary(summary_text, signal = null) {
+async function updateSummary(summary_text, edit, signal = null) {
     console.log("Absolute RPG Adventure:", "updateSummary(): ARA_local.summary_request =", ARA_local.summary_request)
     let data = null;
     try {
@@ -737,10 +754,11 @@ async function updateSummary(summary_text, signal = null) {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-                generate_data: { ...ARA_local.summary_request.generate_data, messages: [] },
-                context_max_tokens: ARA_local.summary_request.context_max_tokens,
+                context_max_tokens: ARA_local.context_max_tokens,
                 ...{ ...ARA_local.summary_request, body: {} },
+                generate_data: { ...ARA_local.summary_request.generate_data, messages: [] },
                 summary: summary_text,
+                summary_edit: edit,
                 ARA: {
                     ...ARA,
                     chat_id: ARA_local.summary_request.chat_id,
@@ -764,7 +782,7 @@ async function updateSummary(summary_text, signal = null) {
 }
 
 async function regenerateSummary(signal = null) {
-    let summary_text = false;
+    let summary_text = null;
     try {
         document.querySelector('#ARA-summary_title').innerHTML = `Waiting for summary...`;
         console.log("Absolute RPG Adventure:", "Generating summary", ARA_local.summary_request)
@@ -776,7 +794,7 @@ async function regenerateSummary(signal = null) {
         const errorMsg = "while getting summary";
         throw new Error(errorMsg);
     }
-    let data = await updateSummary(summary_text, signal)
+    let data = await updateSummary(summary_text, false, signal)
     return data
 }
 
@@ -786,6 +804,7 @@ async function promptAbsoluteRPGAdventure(generate_data, chat_id, signal) {
         AbsoluteRPGAdventureNotLoggedIn()
     }
     const context_max_tokens = oai_settings.openai_max_context
+    ARA_local.context_max_tokens = context_max_tokens
     const body = {
         generate_data,
         context_max_tokens,
@@ -811,7 +830,6 @@ async function promptAbsoluteRPGAdventure(generate_data, chat_id, signal) {
     if (game && game.summary_request) {
         ARA_local.summary_request = game.summary_request
         ARA_local.summary_request.chat_id = chat_id
-        ARA_local.summary_request.context_max_tokens = context_max_tokens
         ARA_local.summary_request.generate_data = generate_data
         AbsoluteRPGAdventureShow(data)
         console.log("Absolute RPG Adventure:", "Generating summary, per request...", ARA_local.summary_request)
