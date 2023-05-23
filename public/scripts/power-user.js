@@ -8,6 +8,7 @@ import {
     reloadCurrentChat,
     getRequestHeaders,
     substituteParams,
+    updateVisibleDivs,
 } from "../script.js";
 import { favsToHotswap } from "./RossAscends-mods.js";
 import {
@@ -134,6 +135,7 @@ let power_user = {
         input_sequence: '### Instruction:',
         output_sequence: '### Response:',
         preset: 'Alpaca',
+        separator_sequence: '',
     }
 };
 
@@ -584,6 +586,7 @@ function loadInstructMode() {
         { id: "instruct_wrap", property: "wrap", isCheckbox: true },
         { id: "instruct_system_prompt", property: "system_prompt", isCheckbox: false },
         { id: "instruct_system_sequence", property: "system_sequence", isCheckbox: false },
+        { id: "instruct_separator_sequence", property: "separator_sequence", isCheckbox: false },
         { id: "instruct_input_sequence", property: "input_sequence", isCheckbox: false },
         { id: "instruct_output_sequence", property: "output_sequence", isCheckbox: false },
         { id: "instruct_stop_sequence", property: "stop_sequence", isCheckbox: false },
@@ -638,11 +641,14 @@ function loadInstructMode() {
     });
 }
 
-export function formatInstructModeChat(name, mes, isUser) {
-    const includeNames = power_user.instruct.names || !!selected_group;
-    const sequence = isUser ? power_user.instruct.input_sequence : power_user.instruct.output_sequence;
+export function formatInstructModeChat(name, mes, isUser, isNarrator, forceAvatar) {
+    const includeNames = isNarrator ? false : (power_user.instruct.names || !!selected_group || !!forceAvatar);
+    const sequence = (isUser || isNarrator) ? power_user.instruct.input_sequence : power_user.instruct.output_sequence;
     const separator = power_user.instruct.wrap ? '\n' : '';
-    const textArray = includeNames ? [sequence, `${name}: ${mes}`, separator] : [sequence, mes, separator];
+    const separatorSequence = power_user.instruct.separator_sequence && !isUser
+        ? power_user.instruct.separator_sequence
+        : (power_user.instruct.wrap ? '\n' : '');
+    const textArray = includeNames ? [sequence, `${name}: ${mes}`, separatorSequence] : [sequence, mes, separatorSequence];
     const text = textArray.filter(x => x).join(separator);
     return text;
 }
@@ -656,12 +662,17 @@ export function formatInstructStoryString(story) {
     return text;
 }
 
-export function formatInstructModePrompt(name, isImpersonate) {
+export function formatInstructModePrompt(name, isImpersonate, promptBias) {
     const includeNames = power_user.instruct.names || !!selected_group;
     const sequence = isImpersonate ? power_user.instruct.input_sequence : power_user.instruct.output_sequence;
     const separator = power_user.instruct.wrap ? '\n' : '';
-    const text = includeNames ? (separator + sequence + separator + `${name}:`) : (separator + sequence);
-    return text;
+    let text = includeNames ? (separator + sequence + separator + `${name}:`) : (separator + sequence);
+
+    if (!isImpersonate && promptBias) {
+        text += (includeNames ? promptBias : (separator + promptBias));
+    }
+
+    return text.trimEnd();
 }
 
 const sortFunc = (a, b) => power_user.sort_order == 'asc' ? compareFunc(a, b) : compareFunc(b, a);
@@ -708,6 +719,7 @@ function sortCharactersList() {
     for (const item of array) {
         $(`${item.selector}[${item.attribute}="${item.id}"]`).css({ 'order': orderedList.indexOf(item) });
     }
+    updateVisibleDivs();
 }
 
 function sortGroupMembers(selector) {
@@ -872,7 +884,7 @@ $(document).ready(() => {
     // include newline is the child of trim sentences
     // if include newline is checked, trim sentences must be checked
     // if trim sentences is unchecked, include newline must be unchecked
-    $("#trim_sentences_checkbox").change(function() {
+    $("#trim_sentences_checkbox").change(function () {
         power_user.trim_sentences = !!$(this).prop("checked");
         if (!$(this).prop("checked")) {
             $("#include_newline_checkbox").prop("checked", false);
@@ -881,7 +893,7 @@ $(document).ready(() => {
         saveSettingsDebounced();
     });
 
-    $("#include_newline_checkbox").change(function() {
+    $("#include_newline_checkbox").change(function () {
         power_user.include_newline = !!$(this).prop("checked");
         if ($(this).prop("checked")) {
             $("#trim_sentences_checkbox").prop("checked", true);
