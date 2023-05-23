@@ -827,10 +827,10 @@ async function promptAbsoluteRPGAdventure(generate_data, chat_id, signal) {
         console.trace("Error:", "Absolute RPG Adventure:", game.error)
         return data;
     }
-    if (game && game.summary_request) {
-        ARA_local.summary_request = game.summary_request
-        ARA_local.summary_request.chat_id = chat_id
-        ARA_local.summary_request.generate_data = generate_data
+    ARA_local.summary_request = game.summary_request
+    ARA_local.summary_request.chat_id = chat_id
+    ARA_local.summary_request.generate_data = generate_data
+    if (game && game.summary_request && game.summary_request.body) {
         AbsoluteRPGAdventureShow(data)
         console.log("Absolute RPG Adventure:", "Generating summary, per request...", ARA_local.summary_request)
         let summaryTriesLeft = 3
