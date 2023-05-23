@@ -533,15 +533,19 @@ let ARA = {
     tokenType: null,
     expiresIn: null,
     expiresAt: null,
+}
+
+let ARA_local = {
+    summary_request: null,
     regeneratingSummary: false,
 }
 
 function summaryUpdateCheck() {
-    if (!ARA.summary_request) {
+    if (!ARA_local.summary_request) {
         console.warn("Absolute RPG Adventure:", "clicked on summary, but there's no latest request")
         return false;
     }
-    if (ARA.regeneratingSummary) {
+    if (ARA_local.regeneratingSummary) {
         console.warn("Absolute RPG Adventure:", "clicked on summary, but already regenerating")
         return false;
     }
@@ -574,7 +578,7 @@ window.addEventListener('load', () => {
         if (!summaryUpdateCheck()) {
             return;
         }
-        ARA.regeneratingSummary = true;
+        ARA_local.regeneratingSummary = true;
         let button_summary_regenerate_innerHTML = ARA_button_summary_regenerate_text.innerHTML;
         try {
             ARA_button_summary_regenerate_text.innerHTML = "Regenerating summary...";
@@ -583,43 +587,76 @@ window.addEventListener('load', () => {
         } catch (error) {
             console.warn("Absolute RPG Adventure:", "summary regeneration failed", error)
         }
-        ARA.regeneratingSummary = false;
+        ARA_local.regeneratingSummary = false;
         ARA_button_summary_regenerate_text.innerHTML = button_summary_regenerate_innerHTML;
     }
 });
 
 async function getARA() {
-    if (ARA && ARA.accessToken) {
-        return ARA
-    }
-
-    let errorMsg = null;
-    ARA.accessToken = localStorage.getItem("ARA.accessToken");
-    if (ARA.accessToken) {
-        ARA.tokenType = localStorage.getItem("ARA.tokenType");
-        ARA.expiresIn = localStorage.getItem("ARA.expiresIn");
-        ARA.expiresAt = localStorage.getItem("ARA.expiresAt");
-        if (new Date(ARA.expiresAt) < Date.now()) {
-            errorMsg = "Login expired"
-            // don't return
-        } else {
-            document.querySelector('#absoluteRPGAdventureLoggedIn').innerHTML = "true";
-            return ARA
-        }
-    }
-
     const fragment = new URLSearchParams(window.location.hash.slice(1));
     const [
         accessToken,
         tokenType,
         expiresIn,
     ] = [
-        fragment.get('access_token'),
-        fragment.get('token_type'),
-        fragment.get('expires_in'),
-    ];
+            fragment.get('access_token'),
+            fragment.get('token_type'),
+            fragment.get('expires_in'),
+        ];
 
-    if (!accessToken) {
+    if (accessToken) {
+        fragment.delete('access_token');
+        fragment.delete('token_type');
+        fragment.delete('expires_in');
+        window.location.hash = fragment.toString();
+
+        const expiresAt = new Date((Date.now() + expiresIn * 1000)).toUTCString();
+        ARA.accessToken = accessToken
+        ARA.tokenType = tokenType
+        ARA.expiresIn = expiresIn
+        ARA.expiresAt = expiresAt
+        localStorage.setItem("ARA.accessToken", accessToken);
+        localStorage.setItem("ARA.tokenType", tokenType);
+        localStorage.setItem("ARA.expiresIn", expiresIn);
+        localStorage.setItem("ARA.expiresAt", expiresAt);
+
+        ARA.id = null
+        // Try to get user id from discord, doesn't matter if it fails
+        try {
+            const response = await fetch('https://discord.com/api/users/@me', {
+                headers: {
+                    authorization: `${tokenType} ${accessToken}`,
+                },
+            });
+            const data = await response.json();
+            ARA.id = data.id;
+            localStorage.setItem("ARA.id", ARA.id);
+            console.log("Absolute RPG Adventure: Logged in with Discord", data);
+        } catch (error) {
+            console.error(error);
+            console.error("Absolute RPG Adventure: Discord call to https://discord.com/api/users/@me failed");
+            console.error("Absolute RPG Adventure: If you have an extremely tight Adblock, Privacy Badger, or HTTPSeverwhere, or something, it's blocking this simple request.");
+        }
+    }
+
+    let errorMsg = null;
+    if (!ARA.accessToken) {
+        ARA.accessToken = localStorage.getItem("ARA.accessToken");
+        if (ARA.accessToken) {
+            ARA.tokenType = localStorage.getItem("ARA.tokenType");
+            ARA.expiresIn = localStorage.getItem("ARA.expiresIn");
+            ARA.expiresAt = localStorage.getItem("ARA.expiresAt");
+            ARA.id = localStorage.getItem("ARA.id");
+            if (new Date(ARA.expiresAt) < Date.now()) {
+                ARA.accessToken = null
+                localStorage.setItem("ARA.accessToken", accessToken);
+                errorMsg = "Login expired"
+                // don't return
+            }
+        }
+    }
+
+    if (!ARA.accessToken) {
         console.warn("Absolute RPG Adventure:", "ARA:", JSON.stringify(ARA), "; fragment:", JSON.stringify(fragment))
         ARA = {
             ...ARA,
@@ -632,36 +669,13 @@ async function getARA() {
         if (errorMsg) {
             document.querySelector('#absoluteRPGAdventureLoggedIn').innerHTML = `false, ${errorMsg}`;
             AbsoluteRPGAdventureShowErrorMsg(errorMsg)
+        } else {
+            document.querySelector('#absoluteRPGAdventureLoggedIn').innerHTML = `false`;
         }
-        return false
+        return false;
     }
-    window.location.hash = ''
-    const expiresAt = new Date((Date.now() + expiresIn * 1000)).toUTCString();
-    ARA.accessToken = accessToken
-    ARA.tokenType = tokenType
-    ARA.expiresIn = expiresIn
-    ARA.expiresAt = expiresAt
-    localStorage.setItem("ARA.accessToken", accessToken);
-    localStorage.setItem("ARA.tokenType", tokenType);
-    localStorage.setItem("ARA.expiresIn", expiresIn);
-    localStorage.setItem("ARA.expiresAt", expiresAt);
-    document.querySelector('#absoluteRPGAdventureLoggedIn').innerHTML = "true";
 
-    // Try to get user id from discord, doesn't matter if it fails
-    try {
-        const response = await fetch('https://discord.com/api/users/@me', {
-            headers: {
-                authorization: `${tokenType} ${accessToken}`,
-            },
-        });
-        const data = await response.json();
-        ARA.id = data.id;
-        console.log("Absolute RPG Adventure: Logged in with Discord", data);
-    } catch (error) {
-        console.error(error);
-        console.error("Absolute RPG Adventure: Discord call to https://discord.com/api/users/@me failed");
-        console.error("Absolute RPG Adventure: If you have an extremely tight Adblock, Privacy Badger, or HTTPSeverwhere, or something, it's blocking this simple request.");
-    }
+    document.querySelector('#absoluteRPGAdventureLoggedIn').innerHTML = "true";
     return ARA;
 }
 
@@ -689,7 +703,6 @@ function AbsoluteRPGAdventureShowErrorMsg(errorMsg) {
 }
 
 function AbsoluteRPGAdventureNotLoggedIn() {
-    document.querySelector('#absoluteRPGAdventureLoggedIn').innerHTML = "false"
     let errorMsg = "Enabled, but login invalid. Not sending request";
     AbsoluteRPGAdventureShowErrorMsg(errorMsg)
     throw new Error(errorMsg);
@@ -699,7 +712,7 @@ async function generateSummary(signal) {
     const generate_url = '/generate_openai';
     const response = await fetch(generate_url, {
         method: 'POST',
-        body: JSON.stringify(ARA.summary_request.body),
+        body: JSON.stringify(ARA_local.summary_request.body),
         headers: getRequestHeaders(),
         signal,
     });
@@ -716,7 +729,7 @@ async function generateSummary(signal) {
 }
 
 async function updateSummary(summary_text, signal = null) {
-    console.log("Absolute RPG Adventure:", "updateSummary(): ARA.summary_request =", ARA.summary_request)
+    console.log("Absolute RPG Adventure:", "updateSummary(): ARA_local.summary_request =", ARA_local.summary_request)
     let data = null;
     try {
         // Send back the summary
@@ -724,13 +737,13 @@ async function updateSummary(summary_text, signal = null) {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-                generate_data: { ...ARA.summary_request.generate_data, messages: [] },
-                context_max_tokens: ARA.summary_request.context_max_tokens,
-                ...{ ...ARA.summary_request, body: {} },
+                generate_data: { ...ARA_local.summary_request.generate_data, messages: [] },
+                context_max_tokens: ARA_local.summary_request.context_max_tokens,
+                ...{ ...ARA_local.summary_request, body: {} },
                 summary: summary_text,
                 ARA: {
                     ...ARA,
-                    chat_id: ARA.summary_request.chat_id,
+                    chat_id: ARA_local.summary_request.chat_id,
                 },
             }),
             signal,
@@ -754,7 +767,7 @@ async function regenerateSummary(signal = null) {
     let summary_text = false;
     try {
         document.querySelector('#ARA-summary_title').innerHTML = `Waiting for summary...`;
-        console.log("Absolute RPG Adventure:", "Generating summary", ARA.summary_request)
+        console.log("Absolute RPG Adventure:", "Generating summary", ARA_local.summary_request)
         let summary_output = await generateSummary(signal)
         console.log("Absolute RPG Adventure:", "summary data:", summary_output)
         summary_text = summary_output.choices[0]["message"]["content"]
@@ -796,12 +809,12 @@ async function promptAbsoluteRPGAdventure(generate_data, chat_id, signal) {
         return data;
     }
     if (game && game.summary_request) {
-        ARA.summary_request = game.summary_request
-        ARA.summary_request.chat_id = chat_id
-        ARA.summary_request.context_max_tokens = context_max_tokens
-        ARA.summary_request.generate_data = generate_data
+        ARA_local.summary_request = game.summary_request
+        ARA_local.summary_request.chat_id = chat_id
+        ARA_local.summary_request.context_max_tokens = context_max_tokens
+        ARA_local.summary_request.generate_data = generate_data
         AbsoluteRPGAdventureShow(data)
-        console.log("Absolute RPG Adventure:", "Generating summary, per request...", ARA.summary_request)
+        console.log("Absolute RPG Adventure:", "Generating summary, per request...", ARA_local.summary_request)
         let summaryTriesLeft = 3
         while (summaryTriesLeft) {
             try {
