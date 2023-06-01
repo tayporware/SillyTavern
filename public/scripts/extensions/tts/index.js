@@ -1,5 +1,5 @@
-import { callPopup, cancelTtsPlay, isMultigenEnabled, is_send_press, saveSettingsDebounced } from '../../../script.js'
-import { extension_settings, getContext } from '../../extensions.js'
+import { callPopup, cancelTtsPlay, eventSource, event_types, isMultigenEnabled, is_send_press, saveSettingsDebounced } from '../../../script.js'
+import { ModuleWorkerWrapper, extension_settings, getContext } from '../../extensions.js'
 import { getStringHash } from '../../utils.js'
 import { ElevenLabsTtsProvider } from './elevenlabs.js'
 import { SileroTtsProvider } from './silerotts.js'
@@ -36,24 +36,6 @@ async function onNarrateOneMessage() {
     resetTtsPlayback()
     ttsJobQueue.push(message);
     moduleWorker();
-}
-
-let isWorkerBusy = false;
-
-async function moduleWorkerWrapper() {
-    // Don't touch me I'm busy...
-    if (isWorkerBusy) {
-        return;
-    }
-
-    // I'm free. Let's update!
-    try {
-        isWorkerBusy = true;
-        await moduleWorker();
-    }
-    finally {
-        isWorkerBusy = false;
-    }
 }
 
 async function moduleWorker() {
@@ -110,11 +92,17 @@ async function moduleWorker() {
 
     // We're currently swiping or streaming. Don't generate voice
     if (
+        !message ||
         message.mes === '...' ||
         message.mes === '' ||
         (context.streamingProcessor && !context.streamingProcessor.isFinished)
     ) {
         return
+    }
+
+    // Don't generate if message doesn't have a display text
+    if (extension_settings.tts.narrate_translated_only && !(message?.extra?.display_text)) {
+        return;
     }
 
     // New messages, add new chat to history
@@ -138,7 +126,7 @@ function resetTtsPlayback() {
 
     // Reset audio element
     audioElement.currentTime = 0;
-    audioElement.src = null;
+    audioElement.src = '';
 
     // Clear any queue items
     ttsJobQueue.splice(0, ttsJobQueue.length);
@@ -151,7 +139,7 @@ function resetTtsPlayback() {
 function isTtsProcessing() {
     let processing = false
 
-    // Check job queues 
+    // Check job queues
     if (ttsJobQueue.length > 0 || audioJobQueue > 0) {
         processing = true
     }
@@ -167,7 +155,7 @@ function debugTtsPlayback() {
         {
             "ttsProviderName": ttsProviderName,
             "currentMessageNumber": currentMessageNumber,
-            "isWorkerBusy":isWorkerBusy,
+            "isWorkerBusy": isWorkerBusy,
             "audioPaused": audioPaused,
             "audioJobQueue": audioJobQueue,
             "currentAudioJob": currentAudioJob,
@@ -232,7 +220,7 @@ async function onTtsVoicesClick() {
             popupText += `
             <div class="voice_preview">
                 <span class="voice_lang">${voice.lang || ''}</span>
-                <b class="voice_name">${voice.name}</b> 
+                <b class="voice_name">${voice.name}</b>
                 <i onclick="tts_preview('${voice.voice_id}')" class="fa-solid fa-play"></i>
             </div>`
             popupText += `<audio id="${voice.voice_id}" src="${voice.preview_url}" data-disabled="${voice.preview_url == false}"></audio>`
@@ -275,7 +263,7 @@ function onAudioControlClicked() {
 function addAudioControl() {
 
     $('#extensionsMenu').prepend(`
-        <div id="ttsExtensionMenuItem" class="list-group-item flex-container flexGap5">    
+        <div id="ttsExtensionMenuItem" class="list-group-item flex-container flexGap5">
             <div id="tts_media_control" class="extensionsMenuExtensionButton "/></div>
             TTS Playback
         </div>`)
@@ -356,9 +344,10 @@ async function processTtsQueue() {
 
     console.debug('New message found, running TTS')
     currentTtsJob = ttsJobQueue.shift()
-    let text = extension_settings.tts.narrate_dialogues_only
-        ? currentTtsJob.mes.replace(/\*[^\*]*?(\*|$)/g, '').trim() // remove asterisks content
-        : currentTtsJob.mes.replaceAll('*', '').trim() // remove just the asterisks
+    let text = extension_settings.tts.narrate_translated_only ? currentTtsJob?.extra?.display_text : currentTtsJob.mes
+    text = extension_settings.tts.narrate_dialogues_only
+        ? text.replace(/\*[^\*]*?(\*|$)/g, '').trim() // remove asterisks content
+        : text.replaceAll('*', '').trim() // remove just the asterisks
 
     if (extension_settings.tts.narrate_quoted_only) {
         const special_quotes = /[“”]/g; // Extend this regex to include other special quotes
@@ -415,6 +404,7 @@ function loadSettings() {
     $('#tts_narrate_dialogues').prop('checked', extension_settings.tts.narrate_dialogues_only)
     $('#tts_narrate_quoted').prop('checked', extension_settings.tts.narrate_quoted_only)
     $('#tts_auto_generation').prop('checked', extension_settings.tts.auto_generation)
+    $('#tts_narrate_translated_only').prop('checked', extension_settings.tts.narrate_translated_only);
     $('body').toggleClass('tts', extension_settings.tts.enabled);
 }
 
@@ -483,15 +473,15 @@ function onApplyClick() {
     Promise.all([
         ttsProvider.onApplyClick(),
         updateVoiceMap()
-    ]).catch(error => {
+    ]).then(() => {
+        extension_settings.tts[ttsProviderName] = ttsProvider.settings
+        saveSettingsDebounced()
+        setTtsStatus('Successfully applied settings', true)
+        console.info(`Saved settings ${ttsProviderName} ${JSON.stringify(ttsProvider.settings)}`)
+    }).catch(error => {
         console.error(error)
         setTtsStatus(error, false)
     })
-
-    extension_settings.tts[ttsProviderName] = ttsProvider.settings
-    saveSettingsDebounced()
-    setTtsStatus('Successfully applied settings', true)
-    console.info(`Saved settings ${ttsProviderName} ${JSON.stringify(ttsProvider.settings)}`)
 }
 
 function onEnableClick() {
@@ -519,6 +509,11 @@ function onNarrateQuotedClick() {
     saveSettingsDebounced()
 }
 
+
+function onNarrateTranslatedOnlyClick() {
+    extension_settings.tts.narrate_translated_only = $('#tts_narrate_translated_only').prop('checked');
+    saveSettingsDebounced();
+}
 
 //##############//
 // TTS Provider //
@@ -607,6 +602,10 @@ $(document).ready(function () {
                             <input type="checkbox" id="tts_narrate_quoted">
                             Narrate quoted only
                         </label>
+                        <label class="checkbox_label" for="tts_narrate_translated_only">
+                            <input type="checkbox" id="tts_narrate_translated_only">
+                            Narrate only the translated text
+                        </label>
                     </div>
                     <label>Voice Map</label>
                     <textarea id="tts_voice_map" type="text" class="text_pole textarea_compact" rows="4"
@@ -630,6 +629,7 @@ $(document).ready(function () {
         $('#tts_enabled').on('click', onEnableClick)
         $('#tts_narrate_dialogues').on('click', onNarrateDialoguesClick);
         $('#tts_narrate_quoted').on('click', onNarrateQuotedClick);
+        $('#tts_narrate_translated_only').on('click', onNarrateTranslatedOnlyClick);
         $('#tts_auto_generation').on('click', onAutoGenerationClick);
         $('#tts_voices').on('click', onTtsVoicesClick)
         $('#tts_provider_settings').on('input', onTtsProviderSettingsInput)
@@ -643,5 +643,7 @@ $(document).ready(function () {
     loadSettings() // Depends on Extension Controls and loadTtsProvider
     loadTtsProvider(extension_settings.tts.currentProvider) // No dependencies
     addAudioControl() // Depends on Extension Controls
-    setInterval(moduleWorkerWrapper, UPDATE_INTERVAL) // Init depends on all the things
+    const wrapper = new ModuleWorkerWrapper(moduleWorker);
+    setInterval(wrapper.update.bind(wrapper), UPDATE_INTERVAL) // Init depends on all the things
+    eventSource.on(event_types.MESSAGE_SWIPED, resetTtsPlayback);
 })

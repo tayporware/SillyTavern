@@ -39,13 +39,11 @@ const multer = require("multer");
 const http = require("http");
 const https = require('https');
 const basicAuthMiddleware = require('./src/middleware/basicAuthMiddleware');
-//const PNG = require('pngjs').PNG;
 const extract = require('png-chunks-extract');
 const encode = require('png-chunks-encode');
 const PNGtext = require('png-chunk-text');
 
 const jimp = require('jimp');
-//const path = require('path');
 const sanitize = require('sanitize-filename');
 const mime = require('mime-types');
 
@@ -54,13 +52,11 @@ const crypto = require('crypto');
 const ipaddr = require('ipaddr.js');
 const json5 = require('json5');
 
-const ExifReader = require('exifreader');
 const exif = require('piexifjs');
 const webp = require('webp-converter');
 const DeviceDetector = require("device-detector-js");
 const { TextEncoder, TextDecoder } = require('util');
 const utf8Encode = new TextEncoder();
-const utf8Decode = new TextDecoder('utf-8', { ignoreBOM: true });
 const commandExistsSync = require('command-exists').sync;
 
 const characterCardParser = require('./src/character-card-parser.js');
@@ -92,37 +88,27 @@ const ai_horde = new AIHorde({
     client_agent: getVersion()?.agent || 'SillyTavern:UNKNOWN:Cohee#1207',
 });
 const ipMatching = require('ip-matching');
+const yauzl = require('yauzl');
 
-var Client = require('node-rest-client').Client;
-var client = new Client();
+const Client = require('node-rest-client').Client;
+const client = new Client();
 
 client.on('error', (err) => {
     console.error('An error occurred:', err);
 });
 
-let poe = require('./poe-client');
+const poe = require('./poe-client');
 
-var api_server = "http://0.0.0.0:5000";
-var api_novelai = "https://api.novelai.net";
+let api_server = "http://0.0.0.0:5000";
+let api_novelai = "https://api.novelai.net";
 let api_openai = "https://api.openai.com/v1";
-var main_api = "kobold";
+let main_api = "kobold";
 
-var response_get_story;
-var response_generate;
-var response_generate_novel;
-var request_promt;
-var response_promt;
-var characters = {};
-var character_i = 0;
-var response_create;
-var response_edit;
-var response_dw_bg;
-var response_getstatus;
-var response_getstatus_novel;
-var response_getlastversion;
+let response_generate_novel;
+let characters = {};
+let response_dw_bg;
+let response_getstatus;
 
-let response_generate_openai;
-let response_getstatus_openai;
 
 //RossAscends: Added function to format dates used in files and chat timestamps to a humanized format.
 //Mostly I wanted this to be for file names, but couldn't figure out exactly where the filename save code was as everything seemed to be connected.
@@ -133,10 +119,27 @@ let response_getstatus_openai;
 
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms))
 
-const { SentencePieceProcessor, cleanText } = require("./src/sentencepiece/sentencepiece.min.js");
-let spp = new SentencePieceProcessor();
+const { SentencePieceProcessor, cleanText } = require("sentencepiece-js");
+
+let spp;
+
+async function loadSentencepieceTokenizer() {
+    try {
+        const spp = new SentencePieceProcessor();
+        await spp.load("src/sentencepiece/tokenizer.model");
+        return spp;
+    } catch (error) {
+        console.error("Sentencepiece tokenizer failed to load.");
+        return null;
+    }
+};
 
 async function countTokensLlama(text) {
+    // Fallback to strlen estimation
+    if (!spp) {
+        return Math.ceil(v.length / 3.35);
+    }
+
     let cleaned = cleanText(text);
 
     let ids = spp.encodeIds(cleaned);
@@ -195,6 +198,7 @@ const directories = {
     themes: 'public/themes',
     extensions: 'public/scripts/extensions',
     instruct: 'public/instruct',
+    context: 'public/context',
 };
 
 // CSRF Protection //
@@ -203,7 +207,7 @@ const doubleCsrf = require('csrf-csrf').doubleCsrf;
 const CSRF_SECRET = crypto.randomBytes(8).toString('hex');
 const COOKIES_SECRET = crypto.randomBytes(8).toString('hex');
 
-const { invalidCsrfTokenError, generateToken, doubleCsrfProtection } = doubleCsrf({
+const { generateToken, doubleCsrfProtection } = doubleCsrf({
     getSecret: () => CSRF_SECRET,
     cookieName: "X-CSRF-Token",
     cookieOptions: {
@@ -325,27 +329,28 @@ app.get('/version', function (_, response) {
 //**************Kobold api
 app.post("/generate", jsonParser, async function (request, response_generate = response) {
     if (!request.body) return response_generate.sendStatus(400);
-    //console.log(request.body.prompt);
-    //const dataJson = JSON.parse(request.body);
-    request_promt = request.body.prompt;
 
-    //console.log(request.body);
-    var this_settings = {
-        prompt: request_promt,
+    const request_prompt = request.body.prompt;
+    const controller = new AbortController();
+    request.socket.removeAllListeners('close');
+    request.socket.on('close', function () {
+        controller.abort();
+    });
+
+    let this_settings = {
+        prompt: request_prompt,
         use_story: false,
         use_memory: false,
         use_authors_note: false,
         use_world_info: false,
         max_context_length: request.body.max_context_length,
         singleline: !!request.body.singleline,
-        //temperature: request.body.temperature,
-        //max_length: request.body.max_length
     };
 
     if (request.body.gui_settings == false) {
-        var sampler_order = [request.body.s1, request.body.s2, request.body.s3, request.body.s4, request.body.s5, request.body.s6, request.body.s7];
+        const sampler_order = [request.body.s1, request.body.s2, request.body.s3, request.body.s4, request.body.s5, request.body.s6, request.body.s7];
         this_settings = {
-            prompt: request_promt,
+            prompt: request_prompt,
             use_story: false,
             use_memory: false,
             use_authors_note: false,
@@ -370,9 +375,10 @@ app.post("/generate", jsonParser, async function (request, response_generate = r
     }
 
     console.log(this_settings);
-    var args = {
-        data: this_settings,
-        headers: { "Content-Type": "application/json" }
+    const args = {
+        body: JSON.stringify(this_settings),
+        signal: controller.signal,
+        headers: { "Content-Type": "application/json" },
     };
 
     const MAX_RETRIES = 10;
@@ -385,19 +391,17 @@ app.post("/generate", jsonParser, async function (request, response_generate = r
         }
         catch (error) {
             // data
-            console.log(error[0]);
+            if (typeof error['text'] === 'function') {
+                console.log(await error.text());
+            }
 
             // response
-            if (error[1]) {
-                switch (error[1].statusCode) {
-                    case 503:
-                        await delay(delayAmount);
-                        break;
-                    default:
-                        return response_generate.send({ error: true });
-                }
-            } else {
-                return response_generate.send({ error: true });
+            switch (error.statusCode) {
+                case 503:
+                    await delay(delayAmount);
+                    break;
+                default:
+                    return response_generate.send({ error: true });
             }
         }
     }
@@ -409,13 +413,15 @@ app.post("/generate_textgenerationwebui", jsonParser, async function (request, r
 
     console.log(request.body);
 
-    if (!!request.header('X-Response-Streaming')) {
-        let isStreamingStopped = false;
-        request.socket.removeAllListeners('close');
-        request.socket.on('close', function () {
-            isStreamingStopped = true;
-        });
+    const controller = new AbortController();
+    let isGenerationStopped = false;
+    request.socket.removeAllListeners('close');
+    request.socket.on('close', function () {
+        isGenerationStopped = true;
+        controller.abort();
+    });
 
+    if (request.header('X-Response-Streaming')) {
         response_generate.writeHead(200, {
             'Content-Type': 'text/plain;charset=utf-8',
             'Transfer-Encoding': 'chunked',
@@ -442,7 +448,7 @@ app.post("/generate_textgenerationwebui", jsonParser, async function (request, r
             });
 
             while (true) {
-                if (isStreamingStopped) {
+                if (isGenerationStopped) {
                     console.error('Streaming stopped by user. Closing websocket...');
                     websocket.close();
                     return;
@@ -487,29 +493,20 @@ app.post("/generate_textgenerationwebui", jsonParser, async function (request, r
         }
     }
     else {
-        var args = {
-            data: request.body,
-            headers: { "Content-Type": "application/json" }
+        const args = {
+            body: JSON.stringify(request.body),
+            headers: { "Content-Type": "application/json" },
+            signal: controller.signal,
         };
-        client.post(api_server + "/v1/generate", args, function (data, response) {
-            console.log("####", data);
-            if (response.statusCode == 200) {
-                console.log(data);
-                response_generate.send(data);
-            }
-            if (response.statusCode == 422) {
-                console.log('Validation error');
-                response_generate.send({ error: true });
-            }
-            if (response.statusCode == 501 || response.statusCode == 503 || response.statusCode == 507) {
-                console.log(data);
-                response_generate.send({ error: true });
-            }
-        }).on('error', function (err) {
-            console.log(err);
-            //console.log('something went wrong on the request', err.request.options);
-            response_generate.send({ error: true });
-        });
+
+        try {
+            const data = await postAsync(api_server + "/v1/generate", args);
+            console.log(data);
+            return response_generate.send(data);
+        } catch (error) {
+            console.log(error);
+            return response_generate.send({ error: true });
+        }
     }
 });
 
@@ -583,6 +580,9 @@ app.post("/getstatus", jsonParser, async function (request, response_getstatus =
         }
     }
     client.get(url, args, function (data, response) {
+        if (typeof data !== 'object') {
+            data = {};
+        }
         if (response.statusCode == 200) {
             data.version = version;
             if (data.result != "ReadOnly") {
@@ -593,7 +593,7 @@ app.post("/getstatus", jsonParser, async function (request, response_getstatus =
             data.result = "no_connection";
         }
         response_getstatus.send(data);
-    }).on('error', function (err) {
+    }).on('error', function () {
         response_getstatus.send({ result: "no_connection" });
     });
 });
@@ -674,22 +674,76 @@ function tryParse(str) {
     }
 }
 
-function checkServer() {
-    api_server = 'http://127.0.0.1:5000';
-    var args = {
-        headers: { "Content-Type": "application/json" }
-    };
-    client.get(api_server + "/v1/model", args, function (data, response) {
-        console.log(data.result);
-        console.log(data);
-    }).on('error', function (err) {
-        console.log(err);
+function convertToV2(char) {
+    // Simulate incoming data from frontend form
+    const result = charaFormatData({
+        json_data: JSON.stringify(char),
+        ch_name: char.name,
+        description: char.description,
+        personality: char.personality,
+        scenario: char.scenario,
+        first_mes: char.first_mes,
+        mes_example: char.mes_example,
+        creatorcomment: char.creatorcomment,
+        talkativeness: char.talkativeness,
+        fav: char.fav,
     });
+
+    result.chat = char.chat;
+    result.create_date = char.create_date;
+    return result;
 }
 
 //***************** Main functions
 function charaFormatData(data) {
-    var char = { "name": data.ch_name, "description": data.description, "personality": data.personality, "first_mes": data.first_mes, "avatar": 'none', "chat": data.ch_name + ' - ' + humanizedISO8601DateTime(), "mes_example": data.mes_example, "scenario": data.scenario, "create_date": humanizedISO8601DateTime(), "talkativeness": data.talkativeness, "fav": data.fav };
+    // This is supposed to save all the foreign keys that ST doesn't care about
+    const _ = require('lodash');
+    const char = tryParse(data.json_data) || {};
+
+    // Spec V1 fields
+    _.set(char, 'name', data.ch_name);
+    _.set(char, 'description', data.description);
+    _.set(char, 'personality', data.personality);
+    _.set(char, 'scenario', data.scenario);
+    _.set(char, 'first_mes', data.first_mes);
+    _.set(char, 'mes_example', data.mes_example);
+
+    // Old ST extension fields (for compatibility, will be deprecated)
+    _.set(char, 'creatorcomment', data.creatorcomment);
+    _.set(char, 'avatar', 'none');
+    _.set(char, 'chat', data.ch_name + ' - ' + humanizedISO8601DateTime());
+    _.set(char, 'talkativeness', data.talkativeness);
+    _.set(char, 'fav', data.fav);
+    _.set(char, 'create_date', humanizedISO8601DateTime());
+
+    // Spec V2 fields
+    _.set(char, 'spec', 'chara_card_v2');
+    _.set(char, 'spec_version', '2.0');
+    _.set(char, 'data.name', data.ch_name);
+    _.set(char, 'data.description', data.description);
+    _.set(char, 'data.personality', data.personality);
+    _.set(char, 'data.scenario', data.scenario);
+    _.set(char, 'data.first_mes', data.first_mes);
+    _.set(char, 'data.mes_example', data.mes_example);
+
+    // New V2 fields
+    _.set(char, 'data.creator_notes', data.creatorcomment);
+    _.set(char, 'data.system_prompt', data.system_prompt);
+    _.set(char, 'data.post_history_instructions', data.post_history_instructions);
+    _.set(char, 'data.tags', []);
+    _.set(char, 'data.creator', data.creator);
+    _.set(char, 'data.character_version', data.character_version);
+
+    // ST extension fields to V2 object
+    _.set(char, 'data.extensions.talkativeness', data.talkativeness);
+    _.set(char, 'data.extensions.fav', data.fav);
+    //_.set(char, 'data.extensions.create_date', humanizedISO8601DateTime());
+    //_.set(char, 'data.extensions.avatar', 'none');
+    //_.set(char, 'data.extensions.chat', data.ch_name + ' - ' + humanizedISO8601DateTime());
+
+    // TODO: Character book
+    _.set(char, 'data.character_book', undefined);
+
     return char;
 }
 
@@ -750,7 +804,6 @@ app.post("/renamecharacter", jsonParser, async function (request, response) {
     const newAvatarName = `${newInternalName}.png`;
 
     const oldAvatarPath = path.join(charactersPath, oldAvatarName);
-    const newAvatarPath = path.join(charactersPath, newAvatarName);
 
     const oldChatsPath = path.join(chatsPath, oldInternalName);
     const newChatsPath = path.join(chatsPath, newInternalName);
@@ -919,10 +972,17 @@ app.post("/getcharacters", jsonParser, function (request, response) {
             try {
                 var img_data = await charaRead(charactersPath + item);
                 let jsonObject = json5.parse(img_data);
+
+                if (jsonObject.spec === undefined) {
+                    //console.log('Old character detected, converting to V2: ' + item);
+                    jsonObject = convertToV2(jsonObject);
+                    //console.log('Conversion complete.', jsonObject);
+                }
+
                 jsonObject.avatar = item;
-                //console.log(jsonObject);
                 characters[i] = {};
                 characters[i] = jsonObject;
+                characters[i]['json_data'] = img_data;
 
                 try {
                     const charStat = fs.statSync(path.join(charactersPath, item));
@@ -1092,30 +1152,88 @@ app.post("/savesettings", jsonParser, function (request, response) {
     });
 });
 
-app.post('/getsettings', jsonParser, (request, response) => { //Wintermute's code
-    const koboldai_settings = [];
-    const koboldai_setting_names = [];
-    const novelai_settings = [];
-    const novelai_setting_names = [];
-    const openai_settings = [];
-    const openai_setting_names = [];
-    const textgenerationwebui_presets = [];
-    const textgenerationwebui_preset_names = [];
-    const themes = [];
-    const instruct = [];
+function readAndParseFromDirectory(directoryPath, fileExtension = '.json') {
+    const files = fs
+        .readdirSync(directoryPath)
+        .filter(x => path.parse(x).ext == fileExtension)
+        .sort();
+
+    const parsedFiles = [];
+
+    files.forEach(item => {
+        try {
+            const file = fs.readFileSync(path.join(directoryPath, item), 'utf-8');
+            parsedFiles.push(fileExtension == '.json' ? json5.parse(file) : file);
+        }
+        catch {
+            // skip
+        }
+    });
+
+    return parsedFiles;
+}
+
+function sortByModifiedDate(directory) {
+    return (a, b) => new Date(fs.statSync(`${directory}/${b}`).mtime) - new Date(fs.statSync(`${directory}/${a}`).mtime);
+}
+
+function readPresetsFromDirectory(directoryPath, options = {}) {
+    const {
+        sortFunction,
+        removeFileExtension = false
+    } = options;
+
+    const files = fs.readdirSync(directoryPath).sort(sortFunction);
+    const fileContents = [];
+    const fileNames = [];
+
+    files.forEach(item => {
+        try {
+            const file = fs.readFileSync(path.join(directoryPath, item), 'utf8');
+            json5.parse(file);
+            fileContents.push(file);
+            fileNames.push(removeFileExtension ? item.replace(/\.[^/.]+$/, '') : item);
+        } catch {
+            // skip
+            console.log(`${item} is not a valid JSON`);
+        }
+    });
+
+    return { fileContents, fileNames };
+}
+
+// Wintermute's code
+app.post('/getsettings', jsonParser, (request, response) => {
     const settings = fs.readFileSync('public/settings.json', 'utf8', (err, data) => {
         if (err) return response.sendStatus(500);
 
         return data;
     });
+
+    // NovelAI Settings
+    const { fileContents: novelai_settings, fileNames: novelai_setting_names }
+        = readPresetsFromDirectory(directories.novelAI_Settings, {
+            sortFunction: sortByModifiedDate(directories.novelAI_Settings),
+            removeFileExtension: true
+        });
+
+    // OpenAI Settings
+    const { fileContents: openai_settings, fileNames: openai_setting_names }
+        = readPresetsFromDirectory(directories.openAI_Settings, {
+            sortFunction: sortByModifiedDate(directories.openAI_Settings), removeFileExtension: true
+        });
+
+    // TextGenerationWebUI Settings
+    const { fileContents: textgenerationwebui_presets, fileNames: textgenerationwebui_preset_names }
+        = readPresetsFromDirectory(directories.textGen_Settings, {
+            sortFunction: sortByModifiedDate(directories.textGen_Settings), removeFileExtension: true
+        });
+
     //Kobold
-    const files = fs
-        .readdirSync('public/KoboldAI Settings')
-        .sort(
-            (a, b) =>
-                new Date(fs.statSync(`public/KoboldAI Settings/${b}`).mtime) -
-                new Date(fs.statSync(`public/KoboldAI Settings/${a}`).mtime)
-        );
+    const { fileContents: koboldai_settings, fileNames: koboldai_setting_names }
+        = readPresetsFromDirectory(directories.koboldAI_Settings, {
+            sortFunction: sortByModifiedDate(directories.koboldAI_Settings), removeFileExtension: true
+        })
 
     const worldFiles = fs
         .readdirSync(directories.worlds)
@@ -1123,135 +1241,9 @@ app.post('/getsettings', jsonParser, (request, response) => { //Wintermute's cod
         .sort((a, b) => a < b);
     const world_names = worldFiles.map(item => path.parse(item).name);
 
-    files.forEach(item => {
-        const file = fs.readFileSync(
-            `public/KoboldAI Settings/${item}`,
-            'utf8',
-            (err, data) => {
-                if (err) return response.sendStatus(500)
-
-                return data;
-            }
-        );
-        koboldai_settings.push(file);
-        koboldai_setting_names.push(item.replace(/\.[^/.]+$/, ''));
-    });
-
-    //Novel
-    const files2 = fs
-        .readdirSync('public/NovelAI Settings')
-        .sort(
-            (a, b) =>
-                new Date(fs.statSync(`public/NovelAI Settings/${b}`).mtime) -
-                new Date(fs.statSync(`public/NovelAI Settings/${a}`).mtime)
-        );
-
-    files2.forEach(item => {
-        const file2 = fs.readFileSync(
-            `public/NovelAI Settings/${item}`,
-            'utf8',
-            (err, data) => {
-                if (err) return response.sendStatus(500);
-
-                return data;
-            }
-        );
-
-        novelai_settings.push(file2);
-        novelai_setting_names.push(item.replace(/\.[^/.]+$/, ''));
-    });
-
-    //OpenAI
-    const files3 = fs
-        .readdirSync('public/OpenAI Settings')
-        .sort(
-            (a, b) =>
-                new Date(fs.statSync(`public/OpenAI Settings/${b}`).mtime) -
-                new Date(fs.statSync(`public/OpenAI Settings/${a}`).mtime)
-        );
-
-    files3.forEach(item => {
-        const file3 = fs.readFileSync(
-            `public/OpenAI Settings/${item}`,
-            'utf8',
-            (err, data) => {
-                if (err) return response.sendStatus(500);
-
-                return data;
-            }
-        );
-
-        openai_settings.push(file3);
-        openai_setting_names.push(item.replace(/\.[^/.]+$/, ''));
-    });
-
-    // TextGenerationWebUI
-    const textGenFiles = fs
-        .readdirSync(directories.textGen_Settings)
-        .sort();
-
-    textGenFiles.forEach(item => {
-        const file = fs.readFileSync(
-            path.join(directories.textGen_Settings, item),
-            'utf8',
-            (err, data) => {
-                if (err) return response.sendStatus(500);
-
-                return data;
-            }
-        );
-
-        textgenerationwebui_presets.push(file);
-        textgenerationwebui_preset_names.push(item.replace(/\.[^/.]+$/, ''));
-    });
-
-    // Theme files
-    const themeFiles = fs
-        .readdirSync(directories.themes)
-        .filter(x => path.parse(x).ext == '.json')
-        .sort();
-
-    themeFiles.forEach(item => {
-        const file = fs.readFileSync(
-            path.join(directories.themes, item),
-            'utf-8',
-            (err, data) => {
-                if (err) return response.sendStatus(500);
-                return data;
-            }
-        );
-
-        try {
-            themes.push(json5.parse(file));
-        }
-        catch {
-            // skip
-        }
-    })
-
-    // Instruct files
-    const instructFiles = fs
-        .readdirSync(directories.instruct)
-        .filter(x => path.parse(x).ext == '.json')
-        .sort();
-
-    instructFiles.forEach(item => {
-        const file = fs.readFileSync(
-            path.join(directories.instruct, item),
-            'utf-8',
-            (err, data) => {
-                if (err) return response.sendStatus(500);
-                return data;
-            }
-        );
-
-        try {
-            instruct.push(json5.parse(file));
-        }
-        catch {
-            // skip
-        }
-    });
+    const themes = readAndParseFromDirectory(directories.themes);
+    const instruct = readAndParseFromDirectory(directories.instruct);
+    const context = readAndParseFromDirectory(directories.context);
 
     response.send({
         settings,
@@ -1266,6 +1258,7 @@ app.post('/getsettings', jsonParser, (request, response) => { //Wintermute's cod
         textgenerationwebui_preset_names,
         themes,
         instruct,
+        context,
         enable_extensions: enableExtensions,
     });
 });
@@ -1367,14 +1360,14 @@ app.post("/getstatus_novelai", jsonParser, function (request, response_getstatus
             console.log(data);
             response_getstatus_novel.send({ error: true });
         }
-    }).on('error', function (err) {
+    }).on('error', function () {
         //console.log('');
         //console.log('something went wrong on the request', err.request.options);
         response_getstatus_novel.send({ error: true });
     });
 });
 
-app.post("/generate_novelai", jsonParser, function (request, response_generate_novel = response) {
+app.post("/generate_novelai", jsonParser, async function (request, response_generate_novel = response) {
     if (!request.body) return response_generate_novel.sendStatus(400);
 
     const api_key_novel = readSecret(SECRET_KEYS.NOVEL);
@@ -1383,8 +1376,14 @@ app.post("/generate_novelai", jsonParser, function (request, response_generate_n
         return response_generate_novel.sendStatus(401);
     }
 
+    const controller = new AbortController();
+    request.socket.removeAllListeners('close');
+    request.socket.on('close', function () {
+        controller.abort();
+    });
+
     console.log(request.body);
-    var data = {
+    const data = {
         "input": request.body.input,
         "model": request.body.model,
         "parameters": {
@@ -1395,8 +1394,13 @@ app.post("/generate_novelai", jsonParser, function (request, response_generate_n
             "tail_free_sampling": request.body.tail_free_sampling,
             "repetition_penalty": request.body.repetition_penalty,
             "repetition_penalty_range": request.body.repetition_penalty_range,
+            "repetition_penalty_slope": request.body.repetition_penalty_slope,
             "repetition_penalty_frequency": request.body.repetition_penalty_frequency,
             "repetition_penalty_presence": request.body.repetition_penalty_presence,
+            "top_a": request.body.top_a,
+            "top_p": request.body.top_p,
+            "top_k": request.body.top_k,
+            "typical_p": request.body.typical_p,
             //"stop_sequences": {{187}},
             //bad_words_ids = {{50256}, {0}, {1}};
             //generate_until_sentence = true;
@@ -1408,37 +1412,31 @@ app.post("/generate_novelai", jsonParser, function (request, response_generate_n
         }
     };
 
-    var args = {
-        data: data,
-
-        headers: { "Content-Type": "application/json", "Authorization": "Bearer " + api_key_novel }
+    const args = {
+        body: JSON.stringify(data),
+        headers: { "Content-Type": "application/json", "Authorization": "Bearer " + api_key_novel },
+        signal: controller.signal,
     };
-    client.post(api_novelai + "/ai/generate", args, function (data, response) {
-        if (response.statusCode == 201) {
-            console.log(data);
-            response_generate_novel.send(data);
+
+    try {
+        const response = await postAsync(api_novelai + "/ai/generate", args);
+        console.log(response);
+        return response_generate_novel.send(response);
+    } catch (error) {
+        switch (error?.statusCode) {
+            case 400:
+                console.log('Validation error');
+                break;
+            case 401:
+                console.log('Access Token is incorrect');
+                break;
+            case 402:
+                console.log('An active subscription is required to access this endpoint');
+                break;
         }
-        if (response.statusCode == 400) {
-            console.log('Validation error');
-            response_generate_novel.send({ error: true });
-        }
-        if (response.statusCode == 401) {
-            console.log('Access Token is incorrect');
-            response_generate_novel.send({ error: true });
-        }
-        if (response.statusCode == 402) {
-            console.log('An active subscription is required to access this endpoint');
-            response_generate_novel.send({ error: true });
-        }
-        if (response.statusCode == 500 || response.statusCode == 409) {
-            console.log(data);
-            response_generate_novel.send({ error: true });
-        }
-    }).on('error', function (err) {
-        //console.log('');
-        //console.log('something went wrong on the request', err.request.options);
-        response_getstatus.send({ error: true });
-    });
+
+        return response_generate_novel.send({ error: true });
+    }
 });
 
 app.post("/getallchatsofcharacter", jsonParser, function (request, response) {
@@ -1454,7 +1452,6 @@ app.post("/getallchatsofcharacter", jsonParser, function (request, response) {
         }
 
         // filter for JSON files
-        console.log('looking for JSONL files');
         const jsonFiles = files.filter(file => path.extname(file) === '.jsonl');
 
         // sort the files by name
@@ -1496,6 +1493,7 @@ app.post("/getallchatsofcharacter", jsonParser, function (request, response) {
                             chatData[i]['file_size'] = fileSizeInKB;
                             chatData[i]['chat_items'] = itemCounter - 1;
                             chatData[i]['mes'] = jsonData['mes'] || '[The chat is empty]';
+                            chatData[i]['last_mes'] = jsonData['send_date'] || Date.now();
                         }
                     }
                     if (ii === 0) {
@@ -1549,6 +1547,7 @@ app.post("/importcharacter", urlencodedParser, async function (request, response
                     let char = {
                         "name": jsonData.name,
                         "description": jsonData.description ?? '',
+                        "creatorcomment": jsonData.creatorcomment ?? '',
                         "personality": jsonData.personality ?? '',
                         "first_mes": jsonData.first_mes ?? '',
                         "avatar": 'none', "chat": jsonData.name + " - " + humanizedISO8601DateTime(),
@@ -1566,6 +1565,7 @@ app.post("/importcharacter", urlencodedParser, async function (request, response
                     let char = {
                         "name": jsonData.char_name,
                         "description": jsonData.char_persona ?? '',
+                        "creatorcomment": '',
                         "personality": '',
                         "first_mes": jsonData.char_greeting ?? '',
                         "avatar": 'none',
@@ -1606,6 +1606,7 @@ app.post("/importcharacter", urlencodedParser, async function (request, response
                     let char = {
                         "name": jsonData.name,
                         "description": jsonData.description ?? '',
+                        "creatorcomment": jsonData.creatorcomment ?? '',
                         "personality": jsonData.personality ?? '',
                         "first_mes": jsonData.first_mes ?? '',
                         "avatar": 'none',
@@ -1625,6 +1626,87 @@ app.post("/importcharacter", urlencodedParser, async function (request, response
         }
     }
 });
+
+app.post("/dupecharacter", jsonParser, async function (request, response) {
+    try {
+        if (!request.body.avatar_url) {
+            console.log("avatar URL not found in request body");
+            console.log(request.body);
+            return response.sendStatus(400);
+        }
+        let filename = path.join(directories.characters, sanitize(request.body.avatar_url));
+        if (!fs.existsSync(filename)) {
+            console.log('file for dupe not found');
+            console.log(filename);
+            return response.sendStatus(404);
+        }
+        let suffix = 1;
+        let newFilename = filename;
+        while (fs.existsSync(newFilename)) {
+            let suffixStr = "_" + suffix;
+            let ext = path.extname(filename);
+            newFilename = filename.slice(0, -ext.length) + suffixStr + ext;
+            suffix++;
+        }
+        fs.copyFile(filename, newFilename, (err) => {
+            if (err) throw err;
+            console.log(`${filename} was copied to ${newFilename}`);
+            response.sendStatus(200);
+        });
+    }
+    catch (error) {
+        console.error(error);
+        return response.send({ error: true });
+    }
+});
+
+app.post("/exportchat", jsonParser, async function (request, response) {
+    if (!request.body.file || (!request.body.avatar_url && request.body.is_group === false)) {
+        return response.sendStatus(400);
+    }
+    const pathToFolder = request.body.is_group
+        ? directories.groupChats
+        : path.join(directories.chats, String(request.body.avatar_url).replace('.png', ''));
+    let filename = path.join(pathToFolder, request.body.file);
+    let exportfilename = request.body.exportfilename
+    if (!fs.existsSync(filename)) {
+        const errorMessage = {
+            message: `Could not find JSONL file to export. Source chat file: ${filename}.`
+        }
+        console.log(errorMessage.message);
+        return response.status(404).json(errorMessage);
+    }
+    try {
+        const readline = require('readline');
+        const fs = require('fs');
+        const readStream = fs.createReadStream(filename);
+        const rl = readline.createInterface({
+            input: readStream,
+        });
+        let buffer = '';
+        rl.on('line', (line) => {
+            const data = JSON.parse(line);
+            if (data.mes) {
+                const name = data.name;
+                const message = (data?.extra?.display_text || data?.mes || '').replace(/\r?\n/g, '\n');
+                buffer += (`${name}: ${message}\n\n`);
+            }
+        });
+        rl.on('close', () => {
+            const successMessage = {
+                message: `Chat saved to ${exportfilename}`,
+                result: buffer,
+            }
+            console.log(`Chat exported as ${exportfilename}`);
+            return response.status(200).json(successMessage);
+        });
+    }
+    catch (err) {
+        console.log("chat export failed.")
+        console.log(err);
+        return response.sendStatus(400);
+    }
+})
 
 app.post("/exportcharacter", jsonParser, async function (request, response) {
     if (!request.body.format || !request.body.avatar_url) {
@@ -1706,6 +1788,8 @@ app.post("/importchat", urlencodedParser, function (request, response) {
     let filedata = request.file;
     let avatar_url = (request.body.avatar_url).replace('.png', '');
     let ch_name = request.body.character_name;
+    let user_name = request.body.user_name || 'You';
+
     if (filedata) {
         if (format === 'json') {
             fs.readFile(`./uploads/${filedata.filename}`, 'utf8', (err, data) => {
@@ -1722,13 +1806,13 @@ app.post("/importchat", urlencodedParser, function (request, response) {
                         from(history) {
                             return [
                                 {
-                                    user_name: 'You',
+                                    user_name: user_name,
                                     character_name: ch_name,
                                     create_date: humanizedISO8601DateTime(),
                                 },
                                 ...history.msgs.map(
                                     (message) => ({
-                                        name: message.src.is_human ? 'You' : ch_name,
+                                        name: message.src.is_human ? user_name : ch_name,
                                         is_user: message.src.is_human,
                                         is_name: true,
                                         send_date: humanizedISO8601DateTime(),
@@ -1755,6 +1839,40 @@ app.post("/importchat", urlencodedParser, function (request, response) {
                     if (0 < errors.length) {
                         response.send('Errors occurred while writing character files. Errors: ' + JSON.stringify(errors));
                     }
+
+                    response.send({ res: true });
+                } else if (Array.isArray(jsonData.data_visible)) {
+                    // oobabooga's format
+                    const chat = [{
+                        user_name: user_name,
+                        character_name: ch_name,
+                        create_date: humanizedISO8601DateTime(),
+                    }];
+
+                    for (const arr of jsonData.data_visible) {
+                        if (arr[0]) {
+                            const userMessage = {
+                                name: user_name,
+                                is_user: true,
+                                is_name: true,
+                                send_date: humanizedISO8601DateTime(),
+                                mes: arr[0],
+                            };
+                            chat.push(userMessage);
+                        }
+                        if (arr[1]) {
+                            const charMessage = {
+                                name: ch_name,
+                                is_user: false,
+                                is_name: true,
+                                send_date: humanizedISO8601DateTime(),
+                                mes: arr[1],
+                            };
+                            chat.push(charMessage);
+                        }
+                    }
+
+                    fs.writeFileSync(`${chatsPath + avatar_url}/${ch_name} - ${humanizedISO8601DateTime()} imported.jsonl`, chat.map(JSON.stringify).join('\n'), 'utf8');
 
                     response.send({ res: true });
                 } else {
@@ -1930,6 +2048,7 @@ app.post('/creategroup', jsonParser, (request, response) => {
         avatar_url: request.body.avatar_url,
         allow_self_responses: !!request.body.allow_self_responses,
         activation_strategy: request.body.activation_strategy ?? 0,
+        disabled_members: request.body.disabled_members ?? [],
         chat_metadata: request.body.chat_metadata ?? {},
         fav: request.body.fav,
         chat_id: request.body.chat_id ?? id,
@@ -2094,6 +2213,15 @@ app.post('/generate_poe', jsonParser, async (request, response) => {
         return response.sendStatus(401);
     }
 
+    let isGenerationStopped = false;
+    request.socket.removeAllListeners('close');
+    request.socket.on('close', function () {
+        isGenerationStopped = true;
+
+        if (client) {
+            client.abortController.abort();
+        }
+    });
     const prompt = request.body.prompt;
     const bot = request.body.bot ?? POE_DEFAULT_BOT;
     const streaming = request.body.streaming ?? false;
@@ -2109,13 +2237,6 @@ app.post('/generate_poe', jsonParser, async (request, response) => {
     }
 
     if (streaming) {
-        let isStreamingStopped = false;
-        request.socket.removeAllListeners('close');
-        request.socket.on('close', function () {
-            isStreamingStopped = true;
-            client.abortController.abort();
-        });
-
         try {
             response.writeHead(200, {
                 'Content-Type': 'text/plain;charset=utf-8',
@@ -2125,7 +2246,7 @@ app.post('/generate_poe', jsonParser, async (request, response) => {
 
             let reply = '';
             for await (const mes of client.send_message(bot, prompt)) {
-                if (isStreamingStopped) {
+                if (isGenerationStopped) {
                     console.error('Streaming stopped by user. Closing websocket...');
                     break;
                 }
@@ -2141,7 +2262,7 @@ app.post('/generate_poe', jsonParser, async (request, response) => {
         }
         finally {
             client.disconnect_ws();
-            return response.end();
+            response.end();
         }
     }
     else {
@@ -2373,7 +2494,7 @@ app.post("/getstatus_openai", jsonParser, function (request, response_getstatus_
             console.log(data);
             response_getstatus_openai.send({ error: true });
         }
-    }).on('error', function (err) {
+    }).on('error', function () {
         response_getstatus_openai.send({ error: true });
     });
 });
@@ -2611,16 +2732,6 @@ app.post("/tokenize_llama", jsonParser, async function (request, response) {
 });
 
 // ** REST CLIENT ASYNC WRAPPERS **
-function deleteAsync(url, args) {
-    return new Promise((resolve, reject) => {
-        client.delete(url, args, (data, response) => {
-            if (response.statusCode >= 400) {
-                reject(data);
-            }
-            resolve(data);
-        }).on('error', e => reject(e));
-    })
-}
 
 function putAsync(url, args) {
     return new Promise((resolve, reject) => {
@@ -2633,15 +2744,15 @@ function putAsync(url, args) {
     })
 }
 
-function postAsync(url, args) {
-    return new Promise((resolve, reject) => {
-        client.post(url, args, (data, response) => {
-            if (response.statusCode >= 400) {
-                reject([data, response]);
-            }
-            resolve(data);
-        }).on('error', e => reject(e));
-    })
+async function postAsync(url, args) {
+    const response = await fetch(url, { method: 'POST', ...args });
+
+    if (response.ok) {
+        const data = await response.json();
+        return data;
+    }
+
+    throw new Error(response);
 }
 
 function getAsync(url, args) {
@@ -2676,7 +2787,7 @@ const setupTasks = async function () {
     // Colab users could run the embedded tool
     if (!is_colab) await convertWebp();
 
-    await spp.load(`./src/sentencepiece/tokenizer.model`);
+    spp = await loadSentencepieceTokenizer();
 
     console.log('Launching...');
 
@@ -2685,12 +2796,12 @@ const setupTasks = async function () {
 }
 
 if (listen && !config.whitelistMode && !config.basicAuthMode) {
-	if (config.securityOverride)
-		console.warn("Security has been override. If it's not a trusted network, change the settings.");
-	else {
-		console.error('Your SillyTavern is currently unsecurely open to the public. Enable whitelisting or basic authentication.');
-		process.exit(1);
-	}
+    if (config.securityOverride)
+        console.warn("Security has been override. If it's not a trusted network, change the settings.");
+    else {
+        console.error('Your SillyTavern is currently unsecurely open to the public. Enable whitelisting or basic authentication.');
+        process.exit(1);
+    }
 }
 
 if (true === cliArguments.ssl)
@@ -2859,19 +2970,20 @@ app.post('/generate_horde', jsonParser, async (request, response) => {
     const url = 'https://horde.koboldai.net/api/v2/generate/text/async';
 
     const args = {
-        data: request.body,
-        headers: {
+        "body": JSON.stringify(request.body),
+        "headers": {
             "Content-Type": "application/json",
             "Client-Agent": request.header('Client-Agent'),
             "apikey": api_key_horde,
         }
     };
 
-    console.log(args.data);
+    console.log(args.body);
     try {
         const data = await postAsync(url, args);
         return response.send(data);
-    } catch {
+    } catch (error) {
+        console.error(error);
         return response.sendStatus(500);
     }
 });
@@ -2979,6 +3091,162 @@ app.post('/horde_generateimage', jsonParser, async (request, response) => {
     }
 });
 
+app.post('/google_translate', jsonParser, async (request, response) => {
+    const { generateRequestUrl, normaliseResponse } = require('google-translate-api-browser');
+
+    const text = request.body.text;
+    const lang = request.body.lang;
+
+    if (!text || !lang) {
+        return response.sendStatus(400);
+    }
+
+    console.log('Input text: ' + text);
+
+    const url = generateRequestUrl(text, { to: lang });
+
+    https.get(url, (resp) => {
+        let data = '';
+
+        resp.on('data', (chunk) => {
+            data += chunk;
+        });
+
+        resp.on('end', () => {
+            const result = normaliseResponse(JSON.parse(data));
+            console.log('Translated text: ' + result.text);
+            return response.send(result.text);
+        });
+    }).on("error", (err) => {
+        console.log("Translation error: " + err.message);
+        return response.sendStatus(500);
+    });
+});
+
+app.post('/delete_sprite', jsonParser, async (request, response) => {
+    const label = request.body.label;
+    const name = request.body.name;
+
+    if (!label || !name) {
+        return response.sendStatus(400);
+    }
+
+    try {
+        const spritesPath = path.join(directories.characters, name);
+
+        // No sprites folder exists, or not a directory
+        if (!fs.existsSync(spritesPath) || !fs.statSync(spritesPath).isDirectory()) {
+            return response.sendStatus(404);
+        }
+
+        const files = fs.readdirSync(spritesPath);
+
+        // Remove existing sprite with the same label
+        for (const file of files) {
+            if (path.parse(file).name === label) {
+                fs.rmSync(path.join(spritesPath, file));
+            }
+        }
+
+        return response.sendStatus(200);
+    } catch (error) {
+        console.error(error);
+        return response.sendStatus(500);
+    }
+});
+
+app.post('/upload_sprite_pack', urlencodedParser, async (request, response) => {
+    const file = request.file;
+    const name = request.body.name;
+
+    if (!file || !name) {
+        return response.sendStatus(400);
+    }
+
+    try {
+        const spritesPath = path.join(directories.characters, name);
+
+        // Create sprites folder if it doesn't exist
+        if (!fs.existsSync(spritesPath)) {
+            fs.mkdirSync(spritesPath);
+        }
+
+        // Path to sprites is not a directory. This should never happen.
+        if (!fs.statSync(spritesPath).isDirectory()) {
+            return response.sendStatus(404);
+        }
+
+        const spritePackPath = path.join("./uploads/", file.filename);
+        const sprites = await getImageBuffers(spritePackPath);
+        const files = fs.readdirSync(spritesPath);
+
+        for (const [filename, buffer] of sprites) {
+            // Remove existing sprite with the same label
+            const existingFile = files.find(file => path.parse(file).name === path.parse(filename).name);
+
+            if (existingFile) {
+                fs.rmSync(path.join(spritesPath, existingFile));
+            }
+
+            // Write sprite buffer to disk
+            const pathToSprite = path.join(spritesPath, filename);
+            fs.writeFileSync(pathToSprite, buffer);
+        }
+
+        // Remove uploaded ZIP file
+        fs.rmSync(spritePackPath);
+        return response.send({ count: sprites.length });
+    } catch (error) {
+        console.error(error);
+        return response.sendStatus(500);
+    }
+});
+
+app.post('/upload_sprite', urlencodedParser, async (request, response) => {
+    const file = request.file;
+    const label = request.body.label;
+    const name = request.body.name;
+
+    if (!file || !label || !name) {
+        return response.sendStatus(400);
+    }
+
+    try {
+        const spritesPath = path.join(directories.characters, name);
+
+        // Create sprites folder if it doesn't exist
+        if (!fs.existsSync(spritesPath)) {
+            fs.mkdirSync(spritesPath);
+        }
+
+        // Path to sprites is not a directory. This should never happen.
+        if (!fs.statSync(spritesPath).isDirectory()) {
+            return response.sendStatus(404);
+        }
+
+        const files = fs.readdirSync(spritesPath);
+
+        // Remove existing sprite with the same label
+        for (const file of files) {
+            if (path.parse(file).name === label) {
+                fs.rmSync(path.join(spritesPath, file));
+            }
+        }
+
+        const filename = label + path.parse(file.originalname).ext;
+        const spritePath = path.join("./uploads/", file.filename);
+        const pathToFile = path.join(spritesPath, filename);
+        // Copy uploaded file to sprites folder
+        fs.cpSync(spritePath, pathToFile);
+        // Remove uploaded file
+        fs.rmSync(spritePath);
+        return response.sendStatus(200);
+    } catch (error) {
+        console.error(error);
+        return response.sendStatus(500);
+    }
+});
+
 function writeSecret(key, value) {
     if (!fs.existsSync(SECRETS_FILE)) {
         const emptyFile = JSON.stringify({});
@@ -2999,4 +3267,55 @@ function readSecret(key) {
     const fileContents = fs.readFileSync(SECRETS_FILE);
     const secrets = JSON.parse(fileContents);
     return secrets[key];
+}
+
+async function getImageBuffers(zipFilePath) {
+    return new Promise((resolve, reject) => {
+        // Check if the zip file exists
+        if (!fs.existsSync(zipFilePath)) {
+            reject(new Error('File not found'));
+            return;
+        }
+
+        const imageBuffers = [];
+
+        yauzl.open(zipFilePath, { lazyEntries: true }, (err, zipfile) => {
+            if (err) {
+                reject(err);
+            } else {
+                zipfile.readEntry();
+                zipfile.on('entry', (entry) => {
+                    const mimeType = mime.lookup(entry.fileName);
+                    if (mimeType && mimeType.startsWith('image/') && !entry.fileName.startsWith('__MACOSX')) {
+                        console.log(`Extracting ${entry.fileName}`);
+                        zipfile.openReadStream(entry, (err, readStream) => {
+                            if (err) {
+                                reject(err);
+                            } else {
+                                const chunks = [];
+                                readStream.on('data', (chunk) => {
+                                    chunks.push(chunk);
+                                });
+
+                                readStream.on('end', () => {
+                                    imageBuffers.push([path.parse(entry.fileName).base, Buffer.concat(chunks)]);
+                                    zipfile.readEntry(); // Continue to the next entry
+                                });
+                            }
+                        });
+                    } else {
+                        zipfile.readEntry(); // Continue to the next entry
+                    }
+                });
+
+                zipfile.on('end', () => {
+                    resolve(imageBuffers);
+                });
+
+                zipfile.on('error', (err) => {
+                    reject(err);
+                });
+            }
+        });
+    });
 }

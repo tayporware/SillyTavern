@@ -144,6 +144,7 @@ async function createNewBookmark() {
         }
     }
 
+    await delay(250);
     let name = await getBookmarkName();
 
     if (!name) {
@@ -213,6 +214,7 @@ async function convertSoloToGroupChat() {
             avatar_url: avatar,
             allow_self_responses: activationStrategy,
             activation_strategy: allowSelfResponses,
+            disabled_members: [],
             chat_metadata: metadata,
             fav: favChecked,
             chat_id: chatName,

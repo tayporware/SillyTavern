@@ -96,6 +96,10 @@ body {
     color: var(--SmartThemeBodyColor);
 }
 
+body.dragover {
+    filter: grayscale(25%) blur(2px);
+}
+
 ::-webkit-scrollbar {
     width: 10px;
     scrollbar-gutter: stable;
@@ -128,10 +132,6 @@ table.responsiveTable {
     border-collapse: collapse;
     word-break: break-all;
     padding: 5px;
-}
-
-.sysHR {
-    border-top: 2px solid grey;
 }
 
 .hiddenByCharListScroll {
@@ -237,6 +237,7 @@ table.responsiveTable {
     text-align: center;
 }
 
+.mes_translate,
 .sd_message_gen,
 .mes_narrate,
 body.tts .mes[is_user="true"] .mes_narrate,
@@ -244,7 +245,33 @@ body.tts .mes[is_system="true"] .mes_narrate {
     display: none;
 }
 
+.mes.smallSysMes {
+    padding: 5px !important;
+    font-size: calc(var(--mainFontSize)* 0.9);
+    text-align: center;
+}
+
+.mes.smallSysMes .mes_text {
+    padding: 0 !important;
+    text-align: center;
+}
+
+.mes.smallSysMes .mes_block {
+    margin-right: unset !important;
+}
+
+.mes.smallSysMes .ch_name {
+    display: none;
+}
+
+.mes.smallSysMes .mesAvatarWrapper {
+    display: none;
+    height: unset;
+    min-height: unset;
+}
+
 body.sd .sd_message_gen,
+body.translate .mes_translate,
 body.tts .mes_narrate {
     display: inline-block;
 }
@@ -416,30 +443,34 @@ code {
     overflow: hidden;
 }
 
-#send_but {
+
+#send_but_sheld>div {
     width: 40px;
     height: 40px;
     margin: 0;
-    display: none;
     outline: none;
     border: none;
     cursor: pointer;
     transition: 0.3s;
     opacity: 0.7;
-    order: 99999;
     align-items: center;
     justify-content: center;
 }
 
-#loading_mes {
+#options_button:hover,
+#send_but_sheld>div:hover {
+    opacity: 1;
+    filter: brightness(1.2);
+}
+
+#send_but {
     display: none;
-    width: 40px;
-    height: 40px;
-    margin: 0 auto;
     order: 99999;
-    align-items: center;
-    justify-content: center;
-    filter: brightness(0.7);
+}
+
+.mes_stop {
+    display: none;
+    order: 99998;
 }
 
 #options_button {
@@ -464,12 +495,6 @@ code {
     font-family: "Noto Sans", "Noto Color Emoji", sans-serif;
     font-size: var(--mainFontSize);
     font-weight: 400;
-}
-
-#options_button:hover,
-#send_but:hover {
-    opacity: 1;
-    filter: brightness(1.2);
 }
 
 #options {
@@ -538,13 +563,14 @@ code {
     font-size: 20px;
     height: 20px;
     width: 20px;
+    text-align: center;
 }
 
-#right-nav-panel hr,
-#personality_div hr,
-#top-settings-holder hr {
+hr {
     background-image: linear-gradient(90deg, var(--transparent), var(--white30a), var(--transparent));
-    min-height: 1px;
+    margin: 5px 0;
+    height: 1px;
+    border: 0;
 }
 
 .options-content a,
@@ -810,7 +836,7 @@ body.big-avatars .avatar img {
 
 br {
     display: block;
-    margin: 3px 0;
+    margin: 2px 0;
 }
 
 textarea {
@@ -1303,22 +1329,6 @@ input[type=search]:focus::-webkit-search-cancel-button {
     width: unset;
 }
 
-#avatar_url_div {
-    display: none;
-}
-
-#selected_chat_div {
-    display: none;
-}
-
-#create_date_div {
-    display: none;
-}
-
-#last_mes_div {
-    display: none;
-}
-
 /*LEFT SIDE BG MENU*/
 
 #logo_block {
@@ -1721,6 +1731,7 @@ input[type=search]:focus::-webkit-search-cancel-button {
 
 /* ------ online status indicators and texts. 2 = kobold AI, 3 = Novel AI  ----------*/
 #online_status2,
+#online_status_horde,
 .online_status4 {
     opacity: 0.5;
     margin-top: 2px;
@@ -1728,6 +1739,7 @@ input[type=search]:focus::-webkit-search-cancel-button {
 }
 
 #online_status_indicator2,
+#online_status_indicator_horde,
 .online_status_indicator4 {
     border-radius: 7px;
     width: 14px;
@@ -1737,6 +1749,7 @@ input[type=search]:focus::-webkit-search-cancel-button {
 }
 
 #online_status_text2,
+#online_status_text_horde,
 .online_status_text4 {
     margin-left: 4px;
     display: inline-block;
@@ -2269,16 +2282,6 @@ input[type="range"]::-webkit-slider-thumb {
     backdrop-filter: blur(var(--SmartThemeBlurStrength));
 }
 
-.mes_stop {
-    display: none;
-    float: right;
-    cursor: pointer;
-    transition: opacity 0.3s ease-in-out;
-    height: 20px;
-    width: 20px;
-    opacity: 0.5;
-}
-
 .mes_buttons {
     height: 20px;
     grid-row-start: 1;
@@ -2408,9 +2411,7 @@ input[type="range"]::-webkit-slider-thumb {
     background-color: var(--black30a);
     backdrop-filter: blur(calc(var(--SmartThemeBlurStrength)*2));
     -webkit-backdrop-filter: blur(calc(var(--SmartThemeBlurStrength)*2));
-    grid-template-rows: 50px 1fr 1fr 1fr 5fr;
-    grid-gap: 10px;
-    min-height: 100px;
+    min-height: calc(100svh - 100px);
     min-width: 100px;
     max-width: var(--sheldWidth);
     max-height: calc(100svh - 100px);
@@ -2422,12 +2423,9 @@ input[type="range"]::-webkit-slider-thumb {
     right: 0;
     top: 40px;
     box-shadow: 0 0 20px var(--black70a);
-    padding-left: 30px;
-    padding-right: 30px;
-    padding-top: 20px;
-    padding-bottom: 30px;
+    padding: 10px;
     border: 1px solid var(--black30a);
-    border-radius: 0 0 20px 20px;
+    border-radius: 0 0 10px 10px;
     overflow-y: auto;
 }
 
@@ -2452,11 +2450,7 @@ h5 {
 
 
 #character_popup_text {
-    display: grid;
-    grid-template-columns: 50px auto;
-    grid-gap: 20px;
     align-items: center;
-    width: 100%;
 }
 
 #personality_textarea {
@@ -2465,8 +2459,8 @@ h5 {
 
 #mes_example_div {
     height: 100%;
-    display: grid;
-    grid-template-rows: min-content auto;
+    display: flex;
+    flex-grow: 1;
 }
 
 #scenario_pole {
@@ -2476,7 +2470,7 @@ h5 {
 
 #mes_example_textarea {
     width: 100%;
-    max-height: 100%;
+    height: 100%;
     margin-left: 0;
 }
 
@@ -2614,7 +2608,8 @@ h5 {
     flex: 1
 }
 
-.renameChatButton {
+.renameChatButton,
+.exportChatButton {
     cursor: pointer;
 }
 
@@ -2790,7 +2785,7 @@ h5 {
 #avatarCropWrap {
     margin: 10px auto;
     max-height: 90%;
-    max-width: 90%;
+    max-width: 100%;
 }
 
 #avatarToCrop {
@@ -2989,11 +2984,34 @@ body .ui-widget-content li:hover {
     align-items: center;
 }
 
+#rm_group_members .right_menu_button[data-action="speak"],
+#rm_group_members .group_member:not(.disabled) .right_menu_button[data-action="disable"] {
+    opacity: 0.4;
+    filter: brightness(0.5);
+    transition: all 0.2s ease-in-out;
+}
+
+/* #rm_group_members .right_menu_button[data-action="speak"]:hover, */
+#rm_group_members .group_member:not(.disabled) .right_menu_button[data-action="disable"]:hover {
+    opacity: inherit;
+    filter: drop-shadow(0px 0px 5px rgb(243, 166, 65));
+}
+
+#rm_group_members .group_member.disabled .right_menu_button[data-action="enable"] {
+    filter: drop-shadow(0px 0px 5px rgb(243, 166, 65));
+}
+
+
+#rm_group_members .right_menu_button[data-action="speak"]:hover {
+    opacity: inherit;
+    filter: drop-shadow(0px 0px 5px rgb(153, 255, 153));
+}
+
 /* Rules for icon display */
-#rm_group_members .group_member[order="start"] .fa-chevron-down,
-#rm_group_members .group_member[order="end"] .fa-chevron-up,
-#rm_group_add_members .right_menu_button:not(.fa-plus, .fa-id-badge),
-#rm_group_members .fa-plus {
+#rm_group_add_members .right_menu_button:not([data-action="add"], [data-action="view"]),
+#rm_group_members .right_menu_button[data-action="add"],
+#rm_group_members .group_member.disabled .right_menu_button[data-action="disable"],
+#rm_group_members .group_member:not(.disabled) .right_menu_button[data-action="enable"] {
     display: none;
 }
 
@@ -3255,12 +3273,6 @@ span.warning {
 p {
     margin-bottom: 16px;
     margin-top: 0;
-}
-
-hr {
-    margin: 5px 0;
-    height: 1px;
-    border: 0;
 }
 
 h1 {
@@ -3922,7 +3934,8 @@ toolcool-color-picker {
 }
 
 .neutral_warning {
-    color: rgba(255, 0, 0, 0.5)
+    color: rgba(225, 0, 0, 0.9);
+    font-weight: 800;
 }
 
 .max_context_unlocked_block .checkbox_label {

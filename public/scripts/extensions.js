@@ -8,11 +8,37 @@ export {
     defaultRequestArgs,
     modules,
     extension_settings,
+    ModuleWorkerWrapper,
 };
 
 let extensionNames = [];
 let manifests = [];
 const defaultUrl = "http://localhost:5100";
+
+// Disables parallel updates
+class ModuleWorkerWrapper {
+    constructor(callback) {
+        this.isBusy = false;
+        this.callback = callback;
+    }
+
+    // Called by the extension
+    async update() {
+        // Don't touch me I'm busy...
+        if (this.isBusy) {
+            return;
+        }
+
+        // I'm free. Let's update!
+        try {
+            this.isBusy = true;
+            await this.callback();
+        }
+        finally {
+            this.isBusy = false;
+        }
+    }
+}
 
 const extension_settings = {
     apiUrl: defaultUrl,
@@ -28,6 +54,8 @@ const extension_settings = {
     tts: {},
     sd: {},
     chromadb: {},
+    translate: {},
+    objective: {},
 };
 
 let modules = [];
@@ -160,6 +188,7 @@ function addExtensionsButtonAndMenu() {
 
     const button = $('#extensionsMenuButton');
     const dropdown = $('#extensionsMenu');
+    dropdown.hide();
 
     let popper = Popper.createPopper(button.get(0), dropdown.get(0), {
         placement: 'top-end',
@@ -314,7 +343,7 @@ async function loadExtensionSettings(settings) {
     manifests = await getManifests(extensionNames)
     await activateExtensions();
     if (extension_settings.autoConnect && extension_settings.apiUrl) {
-        await connectToApi(extension_settings.apiUrl);
+        connectToApi(extension_settings.apiUrl);
     }
 }
 
