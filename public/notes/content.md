@@ -242,6 +242,14 @@ This is useful when your keys are common words or parts of common words.
 
 For example, when this setting is active, keys 'rose' and 'Rose' will be treated differently, depending on the inputs.
 
+## Horde
+
+Horde is a distributed GPU cluster run entirely by volunteers. Your inputs are always anonymous, and prompts are not visible to the workers by default.
+
+However, malicious agents could modify the open-source bridging software to log your activity or produce bad responses. So, when using Horde, avoid sending any personal information such as names, email addresses, etc.
+
+If you encounter any abnormal activity, switch on the "Trusted Workers Only" checkbox and report it to the [KoboldAI Discord](https://koboldai.org/discord).
+
 ## KoboldAI
 
 ### Basic Settings
@@ -387,6 +395,21 @@ If your subscription tier is Paper, Tablet or Scroll use only Euterpe model othe
 **Important!**
 
 _Lost API keys can't be restored! Make sure to keep it safe!_
+
+### Window.ai
+
+You can use Window.ai browser extension to access AI models with SillyTavern.
+
+1. Install a browser extension from: [windowai.io](https://windowai.io/)
+2. Select OpenAI in SillyTavern's Connection panel and check the "Use Window.ai" option.
+3. Use the extension to pick which API to connect to.
+
+Don't have OpenAI / Claude API access? Use OpenRouter.
+
+1. Create an OpenRouter account: [openrouter.ai](https://openrouter.ai/)
+2. Select OpenRouter as a provider in Window.ai extension.
+
+OpenRouter works by letting you use keys that they own. It has a free trial, and paid access afterwards. 
 
 ## Poe
 

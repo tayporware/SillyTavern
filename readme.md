@@ -1,6 +1,8 @@
-# SillyTavern
+![image](https://github.com/Cohee1207/SillyTavern/assets/18619528/8c41a061-7f72-4d2b-9d54-e6d058209e7b)
 
-## Based on a fork of TavernAI 1.2.8
+Mobile-friendly, Multi-API (KoboldAI/CPP, Horde, NovelAI, Ooba, OpenAI+proxies, Poe, WindowAI(Claude!)), VN-like Waifu Mode, Horde SD, System TTS, WorldInfo (lorebooks), customizable UI, auto-translate, and more prompt options than you'd ever want or need. Optional Extras server for more SD/TTS options + ChromaDB/Summarize.
+
+Based on a fork of TavernAI 1.2.8
 
 ### Brought to you by Cohee, RossAscends and the SillyTavern community
 
@@ -54,32 +56,26 @@ Get in touch with the developers directly:
 * Chat bookmarks / branching (duplicates the dialogue in its current state)
 * Advanced KoboldAI / TextGen generation settings with a lot of community-made presets
 * World Info support: create a rich lore or save tokens on your character card
+* Window AI browser extension support (run models like Claude, GPT 4): https://windowai.io/
 * [Oobabooga's TextGen WebUI](https://github.com/oobabooga/text-generation-webui) API connection
 * [AI Horde](https://horde.koboldai.net/) connection
 * [Poe.com](https://poe.com) (ChatGPT / Claude) connection
 * Soft prompts selector for KoboldAI
 * Prompt generation formatting tweaking
 * webp character card interoperability (PNG is still an internal format)
-* Extensibility support via [SillyLossy's TAI-extras](https://github.com/Cohee1207/TavernAI-extras) plugins
-  * Author's Note / Character Bias
-  * Character emotional expressions
-  * Auto-Summary of the chat history
-  * Sending images to chat, and the AI interpreting the content.
-  * Stable Diffusion image generation (5 chat-related presets plus 'free mode')
-  * Text-to-speech for AI response messages (via ElevenLabs, Silero, or the OS's System TTS)
 
-## UI Extensions 🚀
+## Extensions
 
-| Name             | Description                      | Required <a href="https://github.com/Cohee1207/TavernAI-extras#modules" target="_blank">Extra Modules</a> | Screenshot |
-| ---------------- | ---------------------------------| ---------------------------- | ---------- |
-| Image Captioning | Send a cute picture to your bot!<br><br>Picture select option will appear beside the "Message send" button. | `caption`                    | <img src="https://user-images.githubusercontent.com/18619528/224161576-ddfc51cd-995e-44ec-bf2d-d2477d603f0c.png" style="max-width:200px" />  |
-| Character Expressions | See your character reacting to your messages!<br><br>**You need to provide your own character images!**<br><br>1. Create a folder in TavernAI called `public/characters/<name>`, where `<name>` is the name of your character.<br>2. For the base emotion classification model, put six PNG files there with the following names: `joy.png`, `anger.png`, `fear.png`, `love.png`, `sadness.png`, `surprise.png`. Other models may provide other options.<br>3. Images only display in desktop mode. | `classify` | <img style="max-width:200px" alt="image" src="https://user-images.githubusercontent.com/18619528/223765089-34968217-6862-47e0-85da-7357370f8de6.png"> |
-| Memory | Chatbot long-term memory simulation using automatic message context summarization. | `summarize` |  <img style="max-width:200px" alt="image" src="https://user-images.githubusercontent.com/18619528/223766279-88a46481-1fa6-40c5-9724-6cdd6f587233.png"> |
-| D&D Dice | A set of 7 classic D&D dice for all your dice rolling needs.<br><br>*I used to roll the dice.<br>Feel the fear in my enemies' eyes* | None | <img style="max-width:200px" alt="image" src="https://user-images.githubusercontent.com/18619528/226199925-a066c6fc-745e-4a2b-9203-1cbffa481b14.png"> |
-| Author's Note | Built-in extension that allows you to append notes that will be added to the context and steer the story and character in a specific direction. Because it's sent after the character description, it has a lot of weight. Thanks Ali឵#2222 for pitching the idea! | None | ![image](https://user-images.githubusercontent.com/128647114/230311637-d809cd9b-af66-4dd1-a310-7a27e847c011.png) |
-| Character Backgrounds | Built-in extension to assign unique backgrounds to specific chats or groups. | None | <img style="max-width:200px" alt="image" src="https://user-images.githubusercontent.com/18619528/233494454-bfa7c9c7-4faa-4d97-9c69-628fd96edd92.png"> |
-| Stable Diffusion | Use local of cloud-based Stable Diffusion webUI API to generate images. 5 presets included ('you', 'your face', 'me', 'the story', and 'the last message'. Free mode also supported via `/sd (anything_here_)` command in the chat input bar. Most common StableDiffusion generation settings are customizable within the SillyTavern UI. | None | <img style="max-width:200px" alt="image" src="https://files.catbox.moe/ppata8.png"> |
-| Text-to-Speech | AI-generated voice will read back character messages on demand, or automatically read new messages they arrive. Supports ElevenLabs, Silero, and your device's TTS service. | None | <img style="max-width:200px" alt="image" src="https://files.catbox.moe/o3wxkk.png"> |
+SillyTavern has an extensibility support, with some additional AI modules hosted via [SillyTavern Extras API](https://github.com/SillyTavern/SillyTavern-extras)
+
+* Author's Note / Character Bias
+* Character emotional expressions
+* Auto-Summary of the chat history
+* Sending images to chat, and the AI interpreting the content.
+* Stable Diffusion image generation (5 chat-related presets plus 'free mode')
+* Text-to-speech for AI response messages (via ElevenLabs, Silero, or the OS's System TTS)
+
+Full list of included extenisons and tutorials how to use them can be found on [Wiki](https://github.com/SillyTavern/SillyTavern/wiki).
 
 ## UI/CSS/Quality of Life tweaks by RossAscends
 
@@ -139,10 +135,10 @@ Easy to follow guide with pretty pictures:
   4. Browse to or Create a folder that is not controlled or monitored by Windows. (ex: C:\MySpecialFolder\)
   5. Open a Command Prompt inside that folder by clicking in the 'Address Bar' at the top, typing `cmd`, and pressing Enter.
   6. Once the black box (Command Prompt) pops up, type ONE of the following into it and press Enter:
-  
+
 * for Main Branch: `git clone https://github.com/Cohee1207/SillyTavern -b main`
 * for Dev Branch: `git clone https://github.com/Cohee1207/SillyTavern -b dev`
-  
+
   7. Once everything is cloned, double click `Start.bat` to make NodeJS install its requirements.
   8. The server will then start, and SillyTavern will popup in your browser.
 
@@ -209,9 +205,9 @@ Now devices which have the IP specified in the file will be able to connect.
 
 ### 2. Getting the IP for the ST host machine
 
-After the whitelist has been setup, you'll need the IP of the ST-hosting device. 
+After the whitelist has been setup, you'll need the IP of the ST-hosting device.
 
-If the ST-hosting device is on the same wifi network, you will use the ST-host's internal wifi IP: 
+If the ST-hosting device is on the same wifi network, you will use the ST-host's internal wifi IP:
 
 * For Windows: windows button > type `cmd.exe` in the search bar > type `ipconfig` in the console, hit Enter > look for `IPv4` listing.
 
@@ -223,7 +219,7 @@ If you (or someone else) wants to connect to your hosted ST while not being on t
 
 Whatever IP you ended up with for your situation, you will put that IP address and port number into the remote device's web browser.
 
-A typical address for an ST host on the same wifi network would look like: 
+A typical address for an ST host on the same wifi network would look like:
 
 `http://192.168.0.5:8000`
 
@@ -299,3 +295,4 @@ GNU Affero General Public License for more details.**
 * AI Horde client library by ZeldaFan0225: https://github.com/ZeldaFan0225/ai_horde
 * Linux startup script by AlpinDale
 * Thanks paniphons for providing a FAQ document
+* TTS and Objective extensions by Ouoertheo
