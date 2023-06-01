@@ -715,7 +715,7 @@ async function AbsoluteRPGAdventureShow(data) {
         if (data.game.summary) {
             // let summaryHtml = data.game.summary.summary.replace(nl_regex, '<br>');
             document.querySelector('#ARA-summary_text').value = data.game.summary.summary;
-            document.querySelector('#ARA-summary_title').innerHTML = `Summary (${data.game.summary.idxEndGlobal} chats)`;
+            document.querySelector('#ARA-summary_title').innerHTML = `Summary (${data.game.summary.idxEndGlobal} chats, ${data.game.summary.tokenCount} tokens)`;
         }
     }
 }
@@ -791,14 +791,18 @@ async function updateSummary(summary_text, edit, signal = null) {
 
 async function regenerateSummary(signal = null) {
     let summary_text = null;
+    let summary_title_before = document.querySelector('#ARA-summary_title').innerHTML;
+    summary_title_before = summary_title_before.replace(/ \(Error: (.*)\)/g, '')
     try {
         document.querySelector('#ARA-summary_title').innerHTML = `Waiting for summary...`;
         console.log("Absolute RPG Adventure:", "Generating summary", ARA_local.summary_request)
         let summary_output = await generateSummary(signal)
         console.log("Absolute RPG Adventure:", "summary data:", summary_output)
         summary_text = summary_output.choices[0]["message"]["content"]
+        document.querySelector('#ARA-summary_title').innerHTML = summary_title_before
     } catch (error) {
         console.error(error);
+        document.querySelector('#ARA-summary_title').innerHTML = summary_title_before + ` (Error: ${error})`
         const errorMsg = "while getting summary";
         throw new Error(errorMsg);
     }
