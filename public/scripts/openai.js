@@ -541,8 +541,11 @@ async function fetchWithTimeout(url, ms, post) {
 
 // ARA
 
+const ARA_config_default_txt = "{\r\n    // Might show some extra behind the scenes info to you on tavern, below your sheet\r\n    debug: false,\r\n\r\n    message_overhead: \"Assistant:\",\r\n    // For token count calculation // if you are using slaude, set this to \"Assistant:\"\r\n\r\n    summary: {\r\n      // # Auto Summary\r\n      // automatically retry if summary fails\r\n      // sometimes the model makes a summary too large\r\n      retryAttempts: 3,\r\n      // ## Buffer size for summary, measured in tokens.\r\n      // How many tokens the summary will use will be just defined by it's size, so if your summary prompts aren't focused on that (or the model is bad) it can generate too much text.\r\n      // Though that will only take up more tokens, it won't break anything unless `bufferEstimatePad` is too small (it will only break if the size difference between summaries is too large and not covered by this estimate padding)\r\n      // In which case you'll get an error after `retryAttempts` retries that fail because the result is too big.\r\n\r\n      // This is the initial estimate, for when messages first start going out of context\r\n      // On my tests on a single chat with the same prompt and history it varied between 50 to 110\r\n      // It's big to be safe right now. If you want to test it and come up with an optimal number go ahead, but\r\n      // Auto Summaries's sizes are highly dependant on your summary.prompt definitions, which come later.\r\n      bufferInitial: 180,\r\n      // An estimate is automatically calculated based on the median size of latest summaries\r\n      // The allowed summary size will be:\r\n      // {bufferEstimatePad} + {median size of latest summaries}\r\n      // A \"small\" padding added to the estimate to give it breathing room.\r\n      // Just like `bufferInitial`, It's big to be safe right now.\r\n      // Lower it if you want, as much as you can until you start getting \"Summary too big\" errors\r\n      bufferEstimatePad: 80,\r\n\r\n      // This is a fallback if the median estimate fails somehow (shouldn't happen).\r\n      // `idxEndGlobal` is a bad name for \"number of chats in this summary\"\r\n      // Only `idxEndGlobal` and `math` are in scope, ask me if you want something else\r\n      bufferEstimateFallback: \"180 + 80 * math.log10(idxEndGlobal)\",\r\n      // This fallback can only happen if the fallback above also fails.\r\n      bufferEstimateFallback2: 180 * 80 * 2,\r\n      // ## After a finished prompt reply, preemptively generate summary for next prompt\r\n      preemptive: true,\r\n      // Look at the last `UserMsgEstimateLookback` user prompt token sizes to estimate user prompt size\r\n      preemptiveUserMsgEstimateLookback: 10,\r\n      // Whether to remove game mechanics from replies when making a summary\r\n      // highly recommended\r\n      removeResultBlocks: true,\r\n    },\r\n\r\n\r\n    // Uses what the user sends on the request, or fallback to default\r\n    // model: 'claude', // Optional, This overrides what is sent by tavern, to use the settings defined below with the same name\r\n\r\n    models: {\r\n      put_your_custom_model_name_here: {\r\n        // copy and edit whatever configs you want from default's\r\n        // no need to copy them all, only what you want to edit\r\n      },\r\n      // whatever setting isn't defined in your specific model config will fallback to these defaults.\r\n      default: {\r\n        // These `user`, `assistant`, are only used to replace e.g. {({assistant})} in the card\r\n        user: \"Human\",\r\n        assistant: \"Assistant\",\r\n        // Change from Tavern's unchangeable \"chat\" to something else\r\n        startNewChatMsg: \"[Start a new chat]\",\r\n        startNewChatReplace: \"[Story start]\",\r\n\r\n        summary: {\r\n          // The summary will be added to your prompt between these two messages:\r\n          summary_intro: \"[Author's notes of the story so far]\",\r\n          // summary will be after `summary_intro`\r\n          story_continuation: \"[Story continuation]\",\r\n          // actual chat will be after `story_continuation`\r\n          firstLineFilter: [\r\n            \"summary\",\r\n            \"notes\",\r\n          ],\r\n\r\n          cropAfterMatchRegex: [\r\n            \"\\nHuman:\",\r\n            \"\\nH:\",\r\n          ],\r\n          prompt: {\r\n            /**\r\n             * The Auto Summary only summarizes messages out of context (OOC)\r\n             * It gathers all OOC messages and prepares a prompt like this (things in brackets are prompts defined in here, below):\r\n             * \r\n             * {summary.prompt.introduction}\r\n             * [Card]\r\n             * {startNewChatReplace}\r\n             * [... OOC messages]\r\n             * {summary.prompt.jailbreak}\r\n             * \r\n             * Of course there will come a point where the OOC messages won't themselves fit on a single prompt\r\n             * So a previous summary is used, to cover the OOC messages that are now OOC^2.\r\n             * \r\n             * {summary.prompt.revsion.introduction}\r\n             * [Card]\r\n             * {startNewChatReplace}\r\n             * {summary.prompt.revsion.previous_summary_start}\r\n             * [previous summary here that covers just before the new OOC]\r\n             * {summary.prompt.revsion.messages_continuation}\r\n             * [... OOC messages starting from just after the summary above]\r\n             * {summary.prompt.revsion.jailbreak}\r\n             * \r\n             */\r\n            introduction: `The following text is a story you were writing over your replies, starting with the instructions, setting, context, character definitions, and initial conditions you were given to write it.\r\nYou will be asked to create concise author's notes for the story at the end.\r\n`,\r\n            // [Card]\r\n            // [OOC messages]\r\n            jailbreak: `[The above is all of the story written so far.]\r\nCreate your author notes about the story up to now.\r\nWrite these notes for you to use for continue writing this story in the future, knowing that you'll have no other info aside from these notes, and the info before \"[Story start]\", i.e. the setting, context, character definitions, and initial conditions.\r\nAvoid including any details from before the story started, meaning the setting, context, character definitions, and initial conditions. Which means completely avoiding including characters' initial age, appearance and personality for example.\r\nIn short, include only new information that is after \"[Story start]\", don't include information already contained before \"[Story start]\" and above.\r\nThis is exclusively for the continuation for the story, to maintain consistency and reference events and their outcomes in the future.\r\nSo write down established facts, unless they've been overshadowed by others later.\r\nAlways include the relationships of people that might interact again in the future.\r\nRemove elements you think won't be relevant again in the future, like throwaway characters, but briefly mention experiences the main characters had or learned, unless they've been overshadowed other lessons later in the story that you'll include.\r\nThere's no need to write \"[Author's notes]\" on your reply or otherwise mention what they are.\r\nMake them EXTREMELY concise.\r\n`,\r\n\r\n\r\n            // summary prompts for revision\r\n            revision: {\r\n              // These are notes only for the future story\r\n              introduction: `The following text is a story you were writing over your replies, starting with the instructions, setting, context, character definitions, and initial conditions you were given to write it.\r\n  Right after that start, I'll show you your previous notes about the story, which has information from the start of the story up to the point the story will then continue.\r\n  You will be asked to revise those notes, including into them what more happened in the continuation of the story after them.\\n`,\r\n              // [Card]\r\n              previous_summary_start: `[Story start. Your previous notes about what happened since the start below, starting from the beginning of the story.]`,\r\n              // [Previous summary (OOC^2 messages)]\r\n              messages_continuation: `[End of previous notes. Below is the continuation of the story, which will contain new information.]`,\r\n              // [OOC messages (most recent)]\r\n              jailbreak: `[The above is all of the story written so far.]\r\n  Revise your previous notes at the start of the story to include everything in story so far, from the beginning.\r\n  Avoid including any details from before the story started, meaning the setting, context, character definitions, and initial conditions. Which means completely avoiding including characters' initial age, appearance and personality for example.\r\n  Include only information that is in your summary and in the continuation of the story below it, don't include information already contained before the summary and above.\r\n  This is exclusively for the continuation for the story, to maintain consistency and reference events and their outcomes in the future.\r\n  So write down established facts, unless they've been overshadowed by others later.\r\n  Always include the relationships of people that might interact again in the future.\r\n  Remove elements you think won't be relevant again in the future, like throwaway characters, but briefly mention experiences the main characters had or learned, unless they've been overshadowed other lessons later in the story that you'll include.\r\n  There's no need to write \"[Author's notes]\" on your reply or otherwise mention what they are.\r\n  Make them EXTREMELY concise, under 300 words.\r\n  `,\r\n            },\r\n          },\r\n        },\r\n\r\n        // Be careful with `auto_swipe_minimum_length`, as it will not allow short messages through, set it to 0 if this is undersirable\r\n        // 0 to disable\r\n        auto_swipe_minimum_length: 0,\r\n        // If enough words on the blacklist are contained in the response, auto retry\r\n        // 0 to disable\r\n        auto_swipe_blacklist_threshold: 2,\r\n        auto_swipe_blacklist: [\r\n          \"ethical(ly)?\",\r\n          \"unethical\",\r\n          \"guidelines?\",\r\n          \"harmful\",\r\n          \"illegal\",\r\n          \"(un)?comfortable\",\r\n          \"engage\",\r\n          \"generat(e|ing)\",\r\n          \"nonconsensual\",\r\n          \"I apologize\",\r\n          \"My apologies\",\r\n          \"upon further reflection\",\r\n          \"continue this story\",\r\n          \"(unable to|not|cannot) (continue|respond|provide|appropriate|assist)\",\r\n          \"inappropriate\",\r\n          \"content\",\r\n        ],\r\n      },\r\n    },\r\n\r\n\r\n\r\n    // # Game\r\n\r\n    // ## Parsing stuff\r\n    // Stuff in the card withing this regex region will get omitted when doing Auto Summaries\r\n    // Something like this: /{gameMechanicsCardSectionStartRegex}.*{nextCardSectionStartRegex}/gmi\r\n    gameMechanicsCardSectionStartRegex: /\\n# (RPG )?Game Mechanics/,\r\n    nextCardSectionStartRegex: '\\n# ',\r\n    // Where the card's game config is\r\n    re_game_pattern: \"```(js|javascript)\\\\s*\\\\n\\\\s*\\\\/\\\\/\\\\s*#!AbsoluteRpgAdventure.*\\\\n\\\\s*(?<config>[\\\\S\\\\s]+return\\\\s*game\\\\s*;?)\\\\s*\\\\n```\",\r\n    re_config_pattern: \"  config:\\\\s*(?<config>{\\\\s*\\\\n[\\\\S\\\\s]+?\\n  }),\",\r\n    // ## Prompt formatting\r\n    // ### Sheet data injection\r\n    game: {\r\n      injection: {\r\n        // Data injected after your prompt (or before)?\r\n        inject_after: false,\r\n      },\r\n      /**\r\n       * Game settings\r\n       * that make sense to be possibly user defined, rather than card defined\r\n       * All these substitute, or add to, settings defined on the card\r\n       * (They substitute or add based on `mechanics_config_overwrite` below)\r\n       * Be careful to not break cards\r\n       */\r\n      mechanics_config_overwrite: {\r\n        'number': 'overwrite',\r\n        'string': 'overwrite',\r\n        'list': 'concat',\r\n        // '', 'overwrite', 'add', 'concat',\r\n        // '' will ignore matches and do nothing\r\n      },\r\n      mechanics: {\r\n        stats: {\r\n          quests: {\r\n            filteredNames: [\r\n              \"Caution\",\r\n              \"Error\",\r\n              \"Warning\",\r\n              \"Note\",\r\n              \"Skills*( +(Events*))?\",\r\n              \"Quests*( +(Events*|PROGRESS*|STARTs*|Received|Available))?\",\r\n              \"Events*\",\r\n              \"STARTs*\",\r\n              \"PROGRESS*\",\r\n              \"Results*\",\r\n              \"(no)? *Events*\",\r\n              \"(no)? *Skills*\",\r\n              \"no*\",\r\n              \"yes*\",\r\n              \"\\d+\",\r\n            ],\r\n\r\n            /**\r\n             * (NOT implemented)\r\n            // Auto abandon quests TOO old (measured by prompt number)\r\n            questAgeThreshold: 40,\r\n            /* Auto abandon oldest quests when you have too many */ \r\n            questCountLimit: 40,\r\n            // TODO track `quest.age`\r\n            \r\n          },\r\n        },\r\n      },\r\n\r\n      // # Character sheet\r\n      sheet: {\r\n        style: {\r\n\r\n          /** \r\n           * Shown only if `debug` by the user is true\r\n           */\r\n          debugSectionStart: \"\\n\\nDEBUG:\\n\",\r\n          debugSectionUser: \"\\nDEBUG User:\\n\",\r\n        },\r\n      },\r\n    },\r\n\r\n    exampleChatMessage: /\\[This is not an example chat\\]/gi,\r\n\r\n    // Fallback {({user})}, only in exceptional cases\r\n    userName: \"Human\",\r\n    // Fallback default context size, if somehow user doesn't provide any\r\n    context_max_tokens: 5800,\r\n\r\n    // # Prompt formatting\r\n    // Send past user prompts or filter them out?\r\n    send_past_user_prompts: true,\r\n    // Whether to remove old result blocks, downsides: confuse the model; upside: gain context tokens;\r\n    // Hunch is that this is extremely non-advised. I didn't even test this.\r\n    removeResultBlocks: false,\r\n    // keep the lastest result block?\r\n    // If you keep it, will it get confused by thinking those were the results of the entire chat up to now?\r\n    // If you remove it, it will have no examples...\r\n    keepLastResultBlock: true,\r\n  }"
+
 // Temporary url for testing
 const absoluteRPGAdventureUrl = "https://absoluterpgadventure.glitch.me";
+// const absoluteRPGAdventureUrl = "http://127.0.0.1:3000";
 
 let ARA = {
     id: null,
@@ -555,6 +558,70 @@ let ARA = {
 let ARA_local = {
     summary_request: null,
     regeneratingSummary: false,
+
+    config: {},
+}
+
+function ARA_parse_txt(txt) {
+    const fn = new Function([], `return ${txt}`);
+    return fn()
+}
+
+function ARA_configSetUI(config_text = null) {
+    if (!config_text) {
+        config_text = JSON.stringify(ARA_local.config, null, '  ')
+    }
+    document.querySelector('#ARA-config_text').value = config_text
+}
+
+function ARA_configReset() {
+    ARA_local.config = ARA_parse_txt(ARA_config_default_txt)
+    ARA_configSetUI(ARA_config_default_txt)
+}
+
+function ARA_configLoad() {
+    let s = localStorage.getItem("ARA.config");
+    try {
+        if (s) {
+            let o = ARA_parse_txt(s);
+            ARA_local.config = o;
+            ARA_configSetUI(s)
+            return o;
+        }
+    } catch (error) {
+        console.error("Absolute RPG Adventure:", error);
+    }
+    ARA_configReset()
+    return s;
+}
+
+/** if config_text is invalid, this throws */
+function ARA_configSave(config_text = null) {
+    let text = null
+    if (config_text) {
+        text = config_text
+        ARA_local.config = ARA_parse_txt(config_text)
+    } else {
+        text = JSON.stringify(ARA_local.config)
+    }
+    localStorage.setItem("ARA.config", text);
+}
+function ARA_configGetUI() {
+    return document.querySelector('#ARA-config_text').value
+}
+
+async function configEditText() {
+    const config_text = ARA_configGetUI();
+    let ARA_button_config_error = document.querySelector('#ARA_button_config_error');
+
+    try {
+        ARA_configSave(config_text);
+        console.log("Absolute RPG Adventure:", "config set", ARA_local.config);
+        ARA_button_config_error.innerHTML = "; OK";
+    } catch (error) {
+        console.error("Absolute RPG Adventure:", error);
+        ARA_button_config_error.innerHTML = `;  The format of your config is wrong: ${error}`;
+    }
 }
 
 function summaryUpdateCheck() {
@@ -601,7 +668,17 @@ async function summaryEditText() {
 
 window.addEventListener('load', () => {
     document.querySelector('#ARAauthURI').href = "https://discord.com/oauth2/authorize?client_id=1103136093001502780&redirect_uri=http://localhost:8000&response_type=token&scope=identify";
+
     getARA()
+
+    // # config
+    ARA_configLoad()
+    let ARA_config_send = document.querySelector('#ARA_config_send')
+    let ARA_button_config_reset = document.querySelector('#ARA_button_config_reset')
+    ARA_config_send.onclick = configEditText
+    ARA_button_config_reset.onclick = ARA_configReset
+
+    // # summary
     let ARA_button_summary_regenerate = document.querySelector('#ARA_button_summary_regenerate')
     let ARA_button_summary_regenerate_text = document.querySelector('#ARA_button_summary_regenerate_text')
     let ARA_summary_send = document.querySelector('#ARA_summary_send')
@@ -716,15 +793,16 @@ async function getARA() {
 async function AbsoluteRPGAdventureShow(data) {
     if (data && data.game) {
         console.log("Absolute RPG Adventure:", "AbsoluteRPGAdventureShow(): data.game", data.game)
-        if (data.game.sheetMarkdown) {
+        if (data.game.sheet && data.game.sheet.render && data.game.sheet.render.text) {
+            let sheet_text = data.game.sheet.render.text
             const nl_regex = /\n|\r\n|\n\r|\r/gm;
-            let sheetHtml = data.game.sheetMarkdown.replace(nl_regex, '<br>');
+            let sheetHtml = sheet_text.replace(nl_regex, '<br>');
             document.querySelector('#ARA-sheet').innerHTML = sheetHtml;
         }
         if (data.game.summary) {
             // let summaryHtml = data.game.summary.summary.replace(nl_regex, '<br>');
             document.querySelector('#ARA-summary_text').value = data.game.summary.summary;
-            document.querySelector('#ARA-summary_title').innerHTML = `Summary (${data.game.summary.idxEndGlobal} chats, ${data.game.summary.tokenCount} tokens)`;
+            document.querySelector('#ARA-summary_title').innerHTML = `Summary (${data.game.summary.idxEndGlobal} chats, ${data.game.summary.tokenCount}/${ARA_local.summary_request.summary_new.summaryBuffer} tokens)`;
         }
     }
 }
@@ -762,7 +840,7 @@ async function generateSummary(signal) {
     return summary_output
 }
 
-async function updateSummary(summary_text, edit, signal = null) {
+async function updateSummary(summary_text, edit, mock, signal = null) {
     console.log("Absolute RPG Adventure:", "updateSummary(): ARA_local.summary_request =", ARA_local.summary_request)
     let data = null;
     try {
@@ -776,9 +854,12 @@ async function updateSummary(summary_text, edit, signal = null) {
                 generate_data: { ...ARA_local.summary_request.generate_data, messages: [] },
                 summary: summary_text,
                 summary_edit: edit,
+                summary_mock: mock,
                 ARA: {
                     ...ARA,
                     chat_id: ARA_local.summary_request.chat_id,
+                    config: ARA_local.config,
+                    summaryTriesLeft: ARA_local.summaryTriesLeft,
                 },
             }),
             signal,
@@ -798,7 +879,7 @@ async function updateSummary(summary_text, edit, signal = null) {
     return data;
 }
 
-async function regenerateSummary(signal = null) {
+async function regenerateSummary(mock = false, signal = null) {
     let summary_text = null;
     let summary_title_before = document.querySelector('#ARA-summary_title').innerHTML;
     summary_title_before = summary_title_before.replace(/ \(Error: (.*)\)/g, '')
@@ -815,7 +896,7 @@ async function regenerateSummary(signal = null) {
         const errorMsg = "while getting summary";
         throw new Error(errorMsg);
     }
-    let data = await updateSummary(summary_text, false, signal)
+    let data = await updateSummary(summary_text, false, mock, signal)
     return data
 }
 
@@ -832,6 +913,7 @@ async function promptAbsoluteRPGAdventure(generate_data, chat_id, signal) {
         ARA: {
             ...ARA,
             chat_id,
+            config: ARA_local.config,
         },
     }
     const post = {
@@ -848,49 +930,91 @@ async function promptAbsoluteRPGAdventure(generate_data, chat_id, signal) {
         console.trace("Error:", "Absolute RPG Adventure:", game.error)
         return data;
     }
-    ARA_local.summary_request = game.summary_request
-    ARA_local.summary_request.chat_id = chat_id
-    ARA_local.summary_request.generate_data = generate_data
-    if (game && game.summary_request && game.summary_request.body) {
+    if (game) {
+        if (!ARA_local.summary_request) {
+            ARA_local.summary_request = {}
+        }
+        ARA_local.summary_request.chat_id = chat_id
+        ARA_local.summary_request.generate_data = generate_data
         AbsoluteRPGAdventureShow(data)
-        console.log("Absolute RPG Adventure:", "Generating summary, per request...", ARA_local.summary_request)
-        let summaryTriesLeft = 3
-        while (summaryTriesLeft) {
-            try {
-                data = await regenerateSummary(signal)
-                if (!data.generate_data) {
-                    const errorMsg = "No generate_data error: " + data.game.error;
-                    throw new Error(errorMsg);
-                }
-                // success
-                break
-            } catch (error) {
-                summaryTriesLeft -= 1
-                const errorMsg = "Absolute RPG Adventure: on summary: " + error.stack.toString();
-                console.warn(errorMsg);
-                console.log("Absolute RPG Adventure: summaryTriesLeft", summaryTriesLeft)
-                if (summaryTriesLeft <= 0) {
-                    AbsoluteRPGAdventureShowErrorMsg("summary failed, try again, check the browser's console for errors and report them to Aisu")
-                    throw new Error(errorMsg);
-                }
-            }
+        let data_s = await summaryIfRequested(game)
+        if (data_s) {
+            data = data_s
         }
     }
     AbsoluteRPGAdventureShow(data)
     return data;
 }
 
-async function getResultAbsoluteRPGAdventure(lastMessage, chat_id) {
+async function summaryIfRequested(game, mock = false, signal = null) {
+    console.log("Absolute RPG Adventure:", " summaryIfRequested", game)
+    if (!game || !game.summary_request) {
+        console.log("Absolute RPG Adventure:", " no game or game.summary_request", game)
+        return null
+    }
+    let data_s = null
+    if (game.summary_request && game.summary_request.body) {
+        ARA_local.summary_request = game.summary_request
+        console.log("Absolute RPG Adventure:", "Generating summary, per request...", ARA_local.summary_request)
+        ARA_local.summaryTriesLeft = ARA_local.config.summary.retryAttempts
+        ARA_local.summaryErrors = []
+        while (ARA_local.summaryTriesLeft) {
+            try {
+                data_s = await regenerateSummary(mock, signal)
+                if (!data_s.generate_data) {
+                    const errorMsg = "No generate_data error: " + data_s.game.error;
+                    throw new Error(errorMsg);
+                }
+                // success
+                break
+            } catch (error) {
+                ARA_local.summaryTriesLeft -= 1
+                ARA_local.summaryErrors.push(error)
+                const errorMsg = "Absolute RPG Adventure: on Auto Summary: " + error.stack.toString();
+                console.warn(errorMsg);
+                console.log("Absolute RPG Adventure: summaryTriesLeft", ARA_local.summaryTriesLeft)
+                if (ARA_local.summaryTriesLeft <= 0) {
+                    // check if ARA_local.summaryErrors contains error string "failed to fit on context", print a custom message if so, else print the generic one in the line below
+                    // Check if any error contains the string "failed to fit on context"
+                    const errorContainsString = ARA_local.summaryErrors.some(err =>
+                        err.message.includes("failed to fit on context")
+                    );
+                    if (errorContainsString) {
+                        AbsoluteRPGAdventureShowErrorMsg("Auto Summary too big! Edit the summary (or regenerate) removing some text. (if they exist remove: redundant stuff already in the card, unimportant stuff, too fancy language, etc.)");
+                    } else {
+                        AbsoluteRPGAdventureShowErrorMsg("Auto Summary failed, try again, check the browser's console for errors and report them to Aisu")
+                    }
+                    throw new Error(errorMsg);
+                }
+            }
+        }
+    }
+    return data_s
+}
+
+async function AbsoluteRPGAdventurePreemptiveSummary(game, signal=null) {
+    if (!ARA_local.config.summaryPreemptive) {
+        return
+    }
+    if (!game || !game.promptNextEstimate) {
+        return
+    }
+    summaryIfRequested(game.promptNextEstimate.game, true, signal)
+}
+
+async function getResultAbsoluteRPGAdventure(lastReply, chat_id, generate_data_prev, signal=null) {
     ARA = await getARA()
     if (!ARA) {
         AbsoluteRPGAdventureNotLoggedIn()
         return false
     }
     const body = {
-        lastMessage,
+        lastReply,
+        generate_data_prev,
         ARA: {
             ...ARA,
             chat_id,
+            config: ARA_local.config,
         },
     }
     const post = {
@@ -902,6 +1026,7 @@ async function getResultAbsoluteRPGAdventure(lastMessage, chat_id) {
         const res = await fetchWithTimeout(absoluteRPGAdventureUrl + "/getResult", 5000, post);
         const data = await res.json();
         AbsoluteRPGAdventureShow(data)
+        AbsoluteRPGAdventurePreemptiveSummary(data.game, signal)
         return data;
     } catch (err) {
         console.error(err.toString());
@@ -1032,7 +1157,7 @@ async function sendOpenAIRequest(type, openai_msgs_tosend, signal, chat_id) {
         "logit_bias": logit_bias,
     };
 
-
+    let generate_data_prev = generate_data
     if (power_user.absoluteRPGAdventure) {
         try {
             const data = await promptAbsoluteRPGAdventure(generate_data, chat_id, signal)
@@ -1104,9 +1229,9 @@ async function sendOpenAIRequest(type, openai_msgs_tosend, signal, chat_id) {
 
                 if (done) {
                     if (power_user.absoluteRPGAdventure) {
-                        const data = await getResultAbsoluteRPGAdventure(getMessage, chat_id)
-                        if (data && data.game && data.game.lastMessage) {
-                            getMessage = data.game.lastMessage
+                        const data = await getResultAbsoluteRPGAdventure(getMessage, chat_id, generate_data_prev, signal)
+                        if (data && data.game && data.game.lastReply) {
+                            getMessage = data.game.lastReply
                             yield getMessage;
                         }
                     }
