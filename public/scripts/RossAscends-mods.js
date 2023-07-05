@@ -670,9 +670,14 @@ $("document").ready(function () {
 
     $(ARAPin).on("click", function () {
         SaveLocal("ARALockOn", $(ARAPin).prop("checked"));
+        let ARAPin_icon0 = $(ARAPin).siblings("label")[0].children[0];
+        let ARAPin_icon1 = $(ARAPin).siblings("label")[0].children[1];
         if ($(ARAPin).prop("checked") == true) {
             console.log('adding pin class to Left nav');
             $(ARAPanel).addClass('pinnedOpen');
+
+            $(ARAPin_icon0).css('display', 'none')
+            $(ARAPin_icon1).css('display', 'inline')
         } else {
             console.log('removing pin class from Left nav');
             $(ARAPanel).removeClass('pinnedOpen');
@@ -682,6 +687,9 @@ $("document").ready(function () {
                 $(ARADrawerIcon).toggleClass('openIcon closedIcon');
                 $(ARAPanel).toggleClass('openDrawer closedDrawer');
             }
+
+            $(ARAPin_icon0).css('display', 'inline')
+            $(ARAPin_icon1).css('display', 'none')
         }
     });
 

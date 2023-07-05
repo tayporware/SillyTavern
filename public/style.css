@@ -4482,12 +4482,11 @@ body.waifuMode #avatar_zoom_popup {
     }
 }
 
-@font-face {
-    font-family: "VLGothic";
-    src: url("https://ftp.halifax.rwth-aachen.de/osdn/vlgothic/77450/VL-Gothic-Regular.ttf") format("truetype");
-}
 
 #ARA-sheet {
-    font-family: VLGothic, system-ui;
-    font-size: calc(var(--mainFontSize) + 0.2rem);
+    font-family: monospace;
+    font-size: calc(var(--mainFontSize) + 0.3rem);
+}
+#ara-panel {
+    overflow-y: auto;
 }
