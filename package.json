@@ -1,6 +1,7 @@
 {
     "dependencies": {
         "@dqbd/tiktoken": "^1.0.2",
+        "@mlc-ai/web-tokenizers": "^0.1.0",
         "axios": "^1.4.0",
         "command-exists": "^1.2.9",
         "compression": "^1",
@@ -27,6 +28,7 @@
         "png-chunk-text": "^1.0.0",
         "png-chunks-encode": "^1.0.0",
         "png-chunks-extract": "^1.0.0",
+        "response-time": "^2.3.2",
         "rimraf": "^3.0.2",
         "sanitize-filename": "^1.6.3",
         "sentencepiece-js": "^1.1.0",
@@ -45,9 +47,9 @@
     "license": "AGPL-3.0",
     "repository": {
         "type": "git",
-        "url": "https://github.com/Cohee1207/SillyTavern.git"
+        "url": "https://github.com/SillyTavern/SillyTavern.git"
     },
-    "version": "1.6.2",
+    "version": "1.8.3",
     "scripts": {
         "start": "node server.js",
         "pkg": "pkg --compress Gzip --no-bytecode --public ."
@@ -68,7 +70,7 @@
         ],
         "assets": [
             "node_modules/**/*",
-            "poe_graphql/**/*"
+            "src/poe_graphql/**/*"
         ],
         "outputPath": "dist",
         "scripts": [

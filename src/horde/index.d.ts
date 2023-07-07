@@ -5,6 +5,7 @@ declare enum ModelGenerationInputStableSamplers {
     "k_lms" = "k_lms",
     "k_heun" = "k_heun",
     "k_euler" = "k_euler",
+    "k_euler_a" = "k_euler_a",
     "k_dpm_2" = "k_dpm_2",
     "k_dpm_2_a" = "k_dpm_2_a",
     "DDIM" = "DDIM",
@@ -95,7 +96,7 @@ declare class AIHorde {
     /**
      * Lookup user details based on their API key.
      * This can be used to verify a user exists
-     * @param options.token - The token of the user; If none given the default from the contructor is used
+     * @param options.token - The token of the user; If none given the default from the constructor is used
      * @param options.fields - Array of fields that will be included in the returned data
      * @returns UserDetails - The user data of the requested user
      */
