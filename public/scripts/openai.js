@@ -673,24 +673,35 @@ async function ARA_summary_update(data) {
     let chat_id = data.game.chat_id
     if (!chat_id) {
         console.error("Absolute RPG Adventure:", "ARA_summary_update(): No chat_id")
+        return
     }
     if (!ARA_local.chats[chat_id]) {
         ARA_local.chats[chat_id] = {}
     }
     let chat = ARA_local.chats[chat_id]
     if (data.game.summaries) {
-        let summaries = ARA_summaries_flatten_to_last(data.game.summaries)
+        const summaries = ARA_summaries_flatten_to_last(data.game.summaries)
         console.log("Absolute RPG Adventure:", "ARA_summary_update()", "chat_id", chat_id, "summaries", summaries)
         console.log("Absolute RPG Adventure:", "ARA_summary_update()", "chat", JSON.parse(JSON.stringify(chat)))
         if (!chat.summaries) {
             chat.summaries = {}
         }
-        for (let idxEndGlobal in summaries) {
+        for (const idxEndGlobal in summaries) {
             chat.summaries[idxEndGlobal] = {
                 ...chat.summaries[idxEndGlobal],
                 chat_id: chat_id,
                 summary: summaries[idxEndGlobal],
             }
+        }
+        const removed_summaries = []
+        for (const idxEndGlobal in chat.summaries) {
+            if (!(idxEndGlobal in summaries)) {
+                removed_summaries.push(idxEndGlobal)
+            }
+        }
+        for (const r of removed_summaries) {
+            console.log("Absolute RPG Adventure:", "ARA_summary_update() summary removed (server sync)", r, JSON.parse(JSON.stringify(chat.summaries[r])))
+            delete chat.summaries[r]
         }
         console.log("Absolute RPG Adventure:", "ARA_summary_update()", "chat", JSON.parse(JSON.stringify(chat)))
     }
@@ -733,16 +744,20 @@ async function ARA_summary_display() {
         return
     }
     let chat_id = summary_request.chat_id
-    let idxEndGlobal = summary_request.summary.idxEndGlobal
     setSelectOptions("ARA-summary-chat_id-select", Object.keys(ARA_local.chats), chat_id)
 
     let chat = ARA_local.chats[chat_id]
+    let idxEndGlobal = summary_request.summary.idxEndGlobal
     let idxEndGlobal_list = Object.keys(chat.summaries)
+    if (!(idxEndGlobal in idxEndGlobal_list)) {
+        ARA_local.summary_current.idxEndGlobal = idxEndGlobal_list[idxEndGlobal_list.length - 1]
+        summary_request = ARA_summary_request()
+        idxEndGlobal = summary_request.summary.idxEndGlobal
+    }
     setSelectOptions("ARA-summary-idxEndGlobal-select", idxEndGlobal_list, idxEndGlobal)
 
     let idxEndGlobal_last = idxEndGlobal_list[idxEndGlobal_list.length - 1]
-    console.log("Absolute RPG Adventure:", "  summary display", summary_request)
-    console.log("Absolute RPG Adventure:", "  summary display", "ARA_local.summary_current", ARA_local.summary_current)
+    console.log("Absolute RPG Adventure:", "  summary_display", ARA_local.summary_current, summary_request)
 
     document.querySelector('#ARA-summary_text').value = summary_request.summary.summary;
     document.querySelector('#ARA-summary-idxEndGlobal_last').innerHTML = `/${idxEndGlobal_last}`;
@@ -997,9 +1012,9 @@ async function ARA_summaryEditText() {
 
 async function ARA_summary_set_chat_id(chat_id) {
     let chat = ARA_local.chats[chat_id]
-    let chat_idxs = Object.keys(chat)
+    let summaries_idxs = Object.keys(chat.summaries)
     // by default show the last summary
-    let idxEndGlobal = chat_idxs[chat_idxs.length - 1]
+    let idxEndGlobal = summaries_idxs[summaries_idxs.length - 1]
     ARA_local.summary_current = {
         chat_id,
         idxEndGlobal,
@@ -1162,21 +1177,27 @@ async function ARA_get() {
     return ARA;
 }
 
-async function ARA_show(data) {
+function ARA_showSheet(data) {
+    if (data.game.sheet && data.game.sheet.render && data.game.sheet.render.text) {
+        let sheet_text = data.game.sheet.render.text
+        const ARA_sheet_el = document.querySelector('#ARA-sheet')
+        try {
+            ARA_sheet_el.innerHTML = formatTextToHtml(sheet_text).outerHTML
+            HTMLElementCodeHighlight(ARA_sheet_el)
+        } catch (err) {
+            console.error(err)
+            const nl_regex = /\n|\r\n|\n\r|\r/gm;
+            let sheetHtml = sheet_text.replace(nl_regex, '<br>');
+            ARA_sheet_el.innerHTML = sheetHtml;
+        }
+    }
+}
+
+async function ARA_show(data, mock = false) {
+    console.log("Absolute RPG Adventure:", "ARA_show(): data", data)
     if (data && data.game) {
-        console.log("Absolute RPG Adventure:", "AbsoluteRPGAdventureShow(): data.game", data.game)
-        if (data.game.sheet && data.game.sheet.render && data.game.sheet.render.text) {
-            let sheet_text = data.game.sheet.render.text
-            const ARA_sheet_el = document.querySelector('#ARA-sheet')
-            try {
-                ARA_sheet_el.innerHTML = formatTextToHtml(sheet_text).outerHTML
-                HTMLElementCodeHighlight(ARA_sheet_el)
-            } catch (err) {
-                console.error(err)
-                const nl_regex = /\n|\r\n|\n\r|\r/gm;
-                let sheetHtml = sheet_text.replace(nl_regex, '<br>');
-                ARA_sheet_el.innerHTML = sheetHtml;
-            }
+        if (!mock) {
+            ARA_showSheet(data)
         }
         ARA_summary_update(data)
     }
@@ -1369,7 +1390,6 @@ async function ARA_summaryIfRequested(game, mock = false, signal = null) {
 }
 
 async function ARA_summary_preemptive(game, signal = null) {
-    console.log("Absolute RPG Adventure:", "summary_preemptive:", ARA_local.config.summary)
     if (!ARA_local.config.summary || !ARA_local.config.summary.preemptive) {
         return
     }
@@ -1379,8 +1399,9 @@ async function ARA_summary_preemptive(game, signal = null) {
     console.log("Absolute RPG Adventure:", "summary_preemptive:", game.promptPreemptive.game)
     let summary_loc_prev = JSON.parse(JSON.stringify(ARA_local.summary_current))
     let data_s = null
+    const mock = true
     try {
-        data_s = await ARA_summaryIfRequested(game.promptPreemptive.game, true, signal)
+        data_s = await ARA_summaryIfRequested(game.promptPreemptive.game, mock, signal)
         if (data_s) {
             ARA_local.generatedSummary_preemptive = true
         }
@@ -1391,11 +1412,12 @@ async function ARA_summary_preemptive(game, signal = null) {
     }
     ARA_local.summary_current = summary_loc_prev
     if (data_s) {
-        ARA_show(data_s)
+        ARA_show(data_s, mock)
     }
 }
 
-async function ARA_getResult(lastReply, chat_id, generate_data_prev, signal=null) {
+async function ARA_getResult(lastReply, chat_id, generate_data_prev, signal = null) {
+    console.log("Absolute RPG Adventure:", "getResult()")
     ARA = await ARA_get()
     if (!ARA) {
         ARA_notLoggedIn()
