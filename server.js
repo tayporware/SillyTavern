@@ -2963,10 +2963,14 @@ app.post("/openai_bias", jsonParser, async function (request, response) {
             continue;
         }
 
-        const tokens = tokenizer.encode(entry.text);
+        try {
+            const tokens = tokenizer.encode(entry.text);
 
-        for (const token of tokens) {
-            result[token] = entry.value;
+            for (const token of tokens) {
+                result[token] = entry.value;
+            }
+        } catch {
+            console.warn('Tokenizer failed to encode:', entry.text);
         }
     }
 
@@ -3170,6 +3174,7 @@ async function sendClaudeRequest(request, response) {
             }),
             headers: {
                 "Content-Type": "application/json",
+                "anthropic-version": '2023-06-01',
                 "x-api-key": api_key_claude,
             },
             timeout: 0,
@@ -3348,12 +3353,16 @@ app.post("/tokenize_openai", jsonParser, function (request, response_tokenize_op
     const tokenizer = getTiktokenTokenizer(model);
 
     for (const msg of request.body) {
-        num_tokens += tokensPerMessage;
-        for (const [key, value] of Object.entries(msg)) {
-            num_tokens += tokenizer.encode(value).length;
-            if (key == "name") {
-                num_tokens += tokensPerName;
+        try {
+            num_tokens += tokensPerMessage;
+            for (const [key, value] of Object.entries(msg)) {
+                num_tokens += tokenizer.encode(value).length;
+                if (key == "name") {
+                    num_tokens += tokensPerName;
+                }
             }
+        } catch {
+            console.warn("Error tokenizing message:", msg);
         }
     }
     num_tokens += tokensPadding;
@@ -3725,13 +3734,23 @@ app.post('/viewsecrets', jsonParser, async (_, response) => {
 });
 
 app.post('/horde_samplers', jsonParser, async (_, response) => {
-    const samplers = Object.values(ai_horde.ModelGenerationInputStableSamplers);
-    response.send(samplers);
+    try {
+        const samplers = Object.values(ai_horde.ModelGenerationInputStableSamplers);
+        response.send(samplers);
+    } catch (error) {
+        console.error(error);
+        response.sendStatus(500);
+    }
 });
 
 app.post('/horde_models', jsonParser, async (_, response) => {
-    const models = await ai_horde.getModels();
-    response.send(models);
+    try {
+        const models = await ai_horde.getModels();
+        response.send(models);
+    } catch (error) {
+        console.error(error);
+        response.sendStatus(500);
+    }
 });
 
 app.post('/horde_userinfo', jsonParser, async (_, response) => {
