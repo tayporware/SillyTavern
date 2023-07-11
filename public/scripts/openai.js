@@ -702,9 +702,9 @@ async function ARA_summary_update(data) {
                 removed_summaries.push(idxEndGlobal)
             }
         }
-        for (const r of removed_summaries) {
-            console.log("Absolute RPG Adventure:", "ARA_summary_update() summary removed (server sync)", r, JSON.parse(JSON.stringify(chat.summaries[r])))
-            delete chat.summaries[r]
+        for (const idx of removed_summaries) {
+            console.log("Absolute RPG Adventure:", "ARA_summary_update() summary removed (server sync)", idx, JSON.parse(JSON.stringify(chat.summaries[idx])))
+            delete chat.summaries[idx]
         }
         console.log("Absolute RPG Adventure:", "ARA_summary_update()", "chat", JSON.parse(JSON.stringify(chat)))
     }
@@ -751,16 +751,17 @@ async function ARA_summary_display() {
 
     let chat = ARA_local.chats[chat_id]
     let idxEndGlobal = summary_request.summary.idxEndGlobal
-    let idxEndGlobal_list = Object.keys(chat.summaries)
-    if (!(idxEndGlobal in idxEndGlobal_list)) {
-        ARA_local.summary_current.idxEndGlobal = idxEndGlobal_list[idxEndGlobal_list.length - 1]
+    let idxEndGlobal_list = Object.keys(chat.summaries).map(x => Number(x))
+    let idxEndGlobal_last = idxEndGlobal_list[idxEndGlobal_list.length - 1]
+    if (!idxEndGlobal_list.includes(idxEndGlobal)) {
+        console.log("Absolute RPG Adventure:", " summary idx not foundo on list; !idxEndGlobal_list.includes(idxEndGlobal);", "!", idxEndGlobal_list, "includes", idxEndGlobal)
+        ARA_local.summary_current.idxEndGlobal = idxEndGlobal_last
         summary_request = ARA_summary_request()
         idxEndGlobal = summary_request.summary.idxEndGlobal
     }
     setSelectOptions("ARA-summary-idxEndGlobal-select", idxEndGlobal_list, idxEndGlobal)
 
-    let idxEndGlobal_last = idxEndGlobal_list[idxEndGlobal_list.length - 1]
-    console.log("Absolute RPG Adventure:", "  summary_display", ARA_local.summary_current, summary_request)
+    console.log("Absolute RPG Adventure:", "  summary_display", ARA_local.summary_current, summary_request, idxEndGlobal,idxEndGlobal_list)
 
     document.querySelector('#ARA-summary_text').value = summary_request.summary.summary;
     document.querySelector('#ARA-summary-idxEndGlobal_last').innerHTML = `/${idxEndGlobal_last}`;
