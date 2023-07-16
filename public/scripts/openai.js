@@ -638,14 +638,15 @@ let ARA_local = {
 }
 
 function ARA_summary_request() {
-    if (!ARA_local.summary_current.chat_id || ARA_local.summary_current.idxEndGlobal <= -1) {
-        console.warn("No summary selected", "summary_current", ARA_local.summary_current)
-        return null
-    }
     let chat = ARA_local.chats[ARA_local.summary_current.chat_id]
     if (!chat) {
-        console.warn("No chat_id in chats", "summary_current", ARA_local.summary_current, "chats", ARA_local.chats)
-        return null
+        console.warn("No summary selected", "summary_current", ARA_local.summary_current)
+        const chat_ids = Object.keys(ARA_local.chats)
+        if (chat_ids.length == 0) {
+            return null
+        }
+        ARA_local.summary_current.chat_id = chat_ids[chat_ids.length - 1]
+        chat = ARA_local.chats[ARA_local.summary_current.chat_id]
     }
     if (!chat.summaries) {
         console.warn("No summaries in chat", "summary_current", ARA_local.summary_current, "chat", chat)
@@ -654,7 +655,12 @@ function ARA_summary_request() {
     let summary = chat.summaries[ARA_local.summary_current.idxEndGlobal]
     if (!summary) {
         console.warn("Summary idx selected doesn't exist", "summary_current", ARA_local.summary_current, "summaries", chat.summaries)
-        return null
+        const l = chat_summaries_keys(chat)
+        if (l.length == 0) {
+            console.warn("Summaries empty", "summary_current", ARA_local.summary_current, "chat", chat)
+            return null
+        }
+        ARA_local.summary_current.idxEndGlobal = l[l.length - 1]
     }
     return summary
 }
@@ -697,9 +703,30 @@ async function ARA_summary_update(data) {
             }
         }
         const removed_summaries = []
+        // first gather removed idxs in `removed_summaries`, then remove them in the next loop
+        // but also
+        // removals might require  `ARA_local.summary_current.idxEndGlobal` to update to a valid idx
+        // this updates it to the closest valid idx,
+        let idxEndGlobal_prev = ARA_local.summary_current.idxEndGlobal
+        let change = false
         for (const idxEndGlobal in chat.summaries) {
             if (!(idxEndGlobal in summaries)) {
                 removed_summaries.push(idxEndGlobal)
+                // if idx to be removed is equal to current idx
+                // either change it to the previous valid one, or mark it for change if the previous idx is itself (happens when current idx is the first summary of all)
+                if (idxEndGlobal == ARA_local.summary_current.idxEndGlobal) {
+                    if (idxEndGlobal_prev == ARA_local.summary_current.idxEndGlobal) {
+                        change = true
+                    } else {
+                        ARA_local.summary_current.idxEndGlobal = idxEndGlobal_prev
+                    }
+                }
+            } else {
+                if (change) {
+                    ARA_local.summary_current.idxEndGlobal = idxEndGlobal
+                    change = false
+                }
+                idxEndGlobal_prev = idxEndGlobal
             }
         }
         for (const idx of removed_summaries) {
@@ -721,7 +748,6 @@ async function ARA_summary_update(data) {
         }
     } else {
         console.log("Absolute RPG Adventure:", "ARA_summary_update()", "No summary on reply")
-        return
     }
     ARA_summary_display()
 }
@@ -741,6 +767,10 @@ function setSelectOptions(selectId, options, selected_option = null) {
     }
 }
 
+function chat_summaries_keys(chat) {
+    return Object.keys(chat.summaries).map(x => String(x))
+}
+
 async function ARA_summary_display() {
     let summary_request = ARA_summary_request()
     if (!summary_request){
@@ -751,9 +781,9 @@ async function ARA_summary_display() {
 
     let chat = ARA_local.chats[chat_id]
     let idxEndGlobal = summary_request.summary.idxEndGlobal
-    let idxEndGlobal_list = Object.keys(chat.summaries).map(x => Number(x))
+    let idxEndGlobal_list = chat_summaries_keys(chat)
     let idxEndGlobal_last = idxEndGlobal_list[idxEndGlobal_list.length - 1]
-    if (!idxEndGlobal_list.includes(idxEndGlobal)) {
+    if (!idxEndGlobal_list.includes(String(idxEndGlobal))) {
         console.log("Absolute RPG Adventure:", " summary idx not foundo on list; !idxEndGlobal_list.includes(idxEndGlobal);", "!", idxEndGlobal_list, "includes", idxEndGlobal)
         ARA_local.summary_current.idxEndGlobal = idxEndGlobal_last
         summary_request = ARA_summary_request()
@@ -1242,6 +1272,14 @@ async function ARA_generateSummary(signal) {
     return summary_output
 }
 
+function ARA_requestConfig() {
+    const context_max_tokens = oai_settings.openai_max_context
+    ARA_local.context_max_tokens = context_max_tokens
+    return {
+        context_max_tokens,
+    }
+}
+
 async function ARA_summary_req_update(summary_text, edit, mock, signal = null) {
     console.log("Absolute RPG Adventure:", "ARA_summary_req_update() ARA_summary()=", ARA_summary_request())
     let data = null;
@@ -1251,12 +1289,14 @@ async function ARA_summary_req_update(summary_text, edit, mock, signal = null) {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-                context_max_tokens: ARA_local.context_max_tokens,
                 ...ARA_summary_request(),
                 summary_text,
                 summary_edit: edit,
                 summary_mock: mock,
                 summaryTriesLeft: ARA_local.summaryTriesLeft,
+                config: {
+                    ...ARA_requestConfig(),
+                },
                 ARA: {
                     ...ARA,
                     chat_id: ARA_summary_request().chat_id,
@@ -1313,11 +1353,11 @@ async function ARA_prompt(generate_data, chat_id, signal) {
     if (!ARA) {
         ARA_notLoggedIn()
     }
-    const context_max_tokens = oai_settings.openai_max_context
-    ARA_local.context_max_tokens = context_max_tokens
     const body = {
         generate_data,
-        context_max_tokens,
+        config: {
+            ...ARA_requestConfig(),
+        },
         ARA: {
             ...ARA,
             chat_id,
@@ -1430,6 +1470,9 @@ async function ARA_getResult(lastReply, chat_id, generate_data_prev, signal = nu
     const body = {
         lastReply,
         generate_data_prev,
+        config: {
+            ...ARA_requestConfig(),
+        },
         ARA: {
             ...ARA,
             chat_id,
