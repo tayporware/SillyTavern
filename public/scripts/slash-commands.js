@@ -17,9 +17,9 @@ import {
     comment_avatar,
     system_avatar,
     system_message_types,
-    replaceCurrentChat,
     setCharacterId,
     generateQuietPrompt,
+    reloadCurrentChat,
 } from "../script.js";
 import { humanizedDateTime } from "./RossAscends-mods.js";
 import { resetSelectedGroup } from "./group-chats.js";
@@ -61,6 +61,7 @@ class SlashCommandParser {
     }
 
     parse(text) {
+        const excludedFromRegex = ["sendas"]
         const firstSpace = text.indexOf(' ');
         const command = firstSpace !== -1 ? text.substring(1, firstSpace) : text.substring(1);
         const args = firstSpace !== -1 ? text.substring(firstSpace + 1) : '';
@@ -82,6 +83,14 @@ class SlashCommandParser {
             }
 
             unnamedArg = argsArray.slice(Object.keys(argObj).length).join(' ');
+
+            // Excluded commands format in their own function
+            if (!excludedFromRegex.includes(command)) {
+                unnamedArg = getRegexedString(
+                    unnamedArg,
+                    regex_placement.SLASH_COMMAND
+                );
+            }
         }
 
         if (this.commands[command]) {
@@ -116,10 +125,45 @@ parser.addCommand('flat', setFlatModeCallback, ['default'], ' – sets the messa
 parser.addCommand('continue', continueChatCallback, ['cont'], ' – continues the last message in the chat', true, true);
 parser.addCommand('go', goToCharacterCallback, ['char'], '<span class="monospace">(name)</span> – opens up a chat with the character by its name', true, true);
 parser.addCommand('sysgen', generateSystemMessage, [], '<span class="monospace">(prompt)</span> – generates a system message using a specified prompt', true, true);
+parser.addCommand('delname', deleteMessagesByNameCallback, ['cancel'], '<span class="monospace">(name)</span> – deletes all messages attributed to a specified name', true, true);
 
 const NARRATOR_NAME_KEY = 'narrator_name';
 const NARRATOR_NAME_DEFAULT = 'System';
 const COMMENT_NAME_DEFAULT = 'Note';
+
+async function deleteMessagesByNameCallback(_, name) {
+    if (!name) {
+        console.warn('WARN: No name provided for /delname command');
+        return;
+    }
+
+    name = name.trim();
+
+    const messagesToDelete = [];
+    chat.forEach((value) => {
+        if (value.name === name) {
+            messagesToDelete.push(value);
+        }
+    });
+
+    if (!messagesToDelete.length) {
+        console.debug('/delname: Nothing to delete');
+        return;
+    }
+
+    for (const message of messagesToDelete) {
+        const index = chat.indexOf(message);
+        if (index !== -1) {
+            console.debug(`/delname: Deleting message #${index}`, message);
+            chat.splice(index, 1);
+        }
+    }
+
+    await saveChatConditional();
+    await reloadCurrentChat();
+
+    toastr.info(`Deleted ${messagesToDelete.length} messages from ${name}`);
+}
 
 function findCharacterIndex(name) {
     const matchTypes = [
@@ -158,7 +202,7 @@ function openChat(id) {
     resetSelectedGroup();
     setCharacterId(id);
     setTimeout(() => {
-        replaceCurrentChat();
+        reloadCurrentChat();
     }, 1);
 }
 
@@ -177,8 +221,11 @@ async function generateSystemMessage(_, prompt) {
         return;
     }
 
+    // Generate and regex the output if applicable
     toastr.info('Please wait', 'Generating...');
-    const message = await generateQuietPrompt(prompt);
+    let message = await generateQuietPrompt(prompt);
+    message = getRegexedString(message, regex_placement.SLASH_COMMAND);
+
     sendNarratorMessage(_, message);
 }
 
@@ -242,7 +289,9 @@ async function sendMessageAs(_, text) {
 
     const name = parts.shift().trim();
     let mesText = parts.join('\n').trim();
-    mesText = getRegexedString(mesText, regex_placement.SENDAS, { characterOverride: name });
+
+    // Requires a regex check after the slash command is pushed to output
+    mesText = getRegexedString(mesText, regex_placement.SLASH_COMMAND, { characterOverride: name });
 
     // Messages that do nothing but set bias will be hidden from the context
     const bias = extractMessageBias(mesText);
@@ -285,8 +334,6 @@ async function sendNarratorMessage(_, text) {
     if (!text) {
         return;
     }
-
-    text = getRegexedString(text, regex_placement.SYSTEM);
 
     const name = chat_metadata[NARRATOR_NAME_KEY] || NARRATOR_NAME_DEFAULT;
     // Messages that do nothing but set bias will be hidden from the context
